@@ -201,7 +201,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.0</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.1</sub></div>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
     <div class="chip"><div class="cl">BALANCE</div><div class="cv" id="balEl">₹10,000</div></div>
@@ -395,7 +395,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.0 | 7-Check Confluence AI | Grade A+/A/B/C | Smart Filters</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.1 | 7-Check Confluence + HTF Filter | Grade A+/A/B/C</span>
 </div>
 
 </div>
@@ -424,7 +424,7 @@ const S = {
   stEnabled:true,
   soundEnabled:true,
   equityHistory:[{t:Date.now(),v:10000}],
-  mtfData:{},
+  mtfData:{},mtfStatus:"unknown",mtfMsg:"",
   lastSigSound:0
 };
 
@@ -1013,9 +1013,50 @@ function doAI(){
   }
   updateMTFPanel();
 
+  // ── MTF TREND FILTER ─────────────────────────────────────────
+  // 1H + 4H must align with signal direction, else block/warn
+  var mtf1h=S.mtfData[S.sym+'_1h'], mtf4h=S.mtfData[S.sym+'_4h'];
+  var mtfStatus='unknown'; // 'aligned','warn','opposed','unknown'
+  var mtfMsg='';
+  if(typeof mtf1h!=='undefined'&&typeof mtf4h!=='undefined'){
+    var h1Bull=mtf1h>18, h1Bear=mtf1h<-18;
+    var h4Bull=mtf4h>18, h4Bear=mtf4h<-18;
+    if(a.isBuy||a.isBuyWeak){
+      if(h1Bull&&h4Bull){mtfStatus='aligned';mtfMsg='1H▲ 4H▲ aligned';}
+      else if(h1Bear&&h4Bear){mtfStatus='opposed';mtfMsg='1H▼ 4H▼ opposed — BLOCKED';}
+      else if(h1Bear||h4Bear){mtfStatus='warn';mtfMsg=(h4Bear?'4H bearish — risky buy':'1H bearish — risky buy');}
+      else{mtfStatus='aligned';mtfMsg='1H+4H neutral';}
+    }else if(a.isSell||a.isSellWeak){
+      if(h1Bear&&h4Bear){mtfStatus='aligned';mtfMsg='1H▼ 4H▼ aligned';}
+      else if(h1Bull&&h4Bull){mtfStatus='opposed';mtfMsg='1H▲ 4H▲ opposed — BLOCKED';}
+      else if(h1Bull||h4Bull){mtfStatus='warn';mtfMsg=(h4Bull?'4H bullish — risky sell':'1H bullish — risky sell');}
+      else{mtfStatus='aligned';mtfMsg='1H+4H neutral';}
+    }else{
+      if(h1Bull&&h4Bull)mtfMsg='1H▲ 4H▲ (look for BUY)';
+      else if(h1Bear&&h4Bear)mtfMsg='1H▼ 4H▼ (look for SELL)';
+      else mtfMsg='1H+4H mixed trend';
+      mtfStatus='unknown';
+    }
+    // Apply MTF override on signal & button
+    if(mtfStatus==='opposed'&&(a.isBuy||a.isBuyWeak||a.isSell||a.isSellWeak)){
+      sig.innerHTML=(a.isBuy||a.isBuyWeak?'⬆':'⬇')+' MTF BLOCKED'+gbadge;
+      sig.style.color='var(--gold)';
+      btn.className='ai-btn btn-wait';
+      btn.textContent='⛔ '+mtfMsg.substring(0,35);
+    }else if(mtfStatus==='warn'&&(a.isBuy||a.isSell)){
+      // Downgrade strong to weak — show warning but allow manual trade
+      btn.textContent=btn.textContent+' ⚠';
+    }else if(mtfStatus==='aligned'&&(a.isBuy||a.isSell)){
+      // Boost button text to show MTF alignment
+      btn.textContent=btn.textContent+' ✔HTF';
+    }
+  }
+  S.mtfStatus=mtfStatus; S.mtfMsg=mtfMsg;
+
   var cn=Math.max(a.bullCount,a.bearCount);
   var fgE=FG.value<=35?'🔴':FG.value<=55?'🟡':'🟢';
-  conf.textContent='Score '+(a.score>0?'+':'')+a.score.toFixed(0)+' │ '+cn+'/7 conf │ '+fgE+' F&G '+FG.value;
+  var mtfBadge=mtfStatus==='aligned'?' │ ✔HTF':mtfStatus==='opposed'?' │ ⛔HTF':mtfStatus==='warn'?' │ ⚠HTF':'';
+  conf.textContent='Score '+(a.score>0?'+':'')+a.score.toFixed(0)+' │ '+cn+'/7'+mtfBadge+' │ '+fgE+' '+FG.value;
 
   setM('rsi',a.rsiV<30?85:a.rsiV>70?15:50,a.rsiV<30?'var(--green)':a.rsiV>70?'var(--red)':'var(--gold)',a.rsiV.toFixed(0));
   setM('macd',a.macdV.h>0?75:25,a.macdV.h>0?'var(--green)':'var(--red)',a.macdV.h>0?'BUL':'BEA');
@@ -1077,13 +1118,27 @@ function updateMTFPanel(){
   var el=document.getElementById('mtfPanel');if(!el)return;
   var tfs=['1m','5m','15m','1h','4h'];
   var rows='';
+  var curDir=S.lastA?(S.lastA.isBuy||S.lastA.isBuyWeak?'buy':S.lastA.isSell||S.lastA.isSellWeak?'sell':'n'):'n';
   for(var i=0;i<tfs.length;i++){
     var tf=tfs[i];
     var score=S.mtfData[S.sym+'_'+tf];
-    var col=typeof score!=='undefined'?(score>20?'var(--green)':score<-20?'var(--red)':'var(--gold)'):'var(--text2)';
-    var txt=typeof score!=='undefined'?(score>20?'▲ BUY':score<-20?'▼ SELL':'— NEUT'):'...';
-    var bg=typeof score!=='undefined'?(score>20?'rgba(0,240,122,.06)':score<-20?'rgba(255,45,85,.06)':'rgba(255,200,50,.04)'):'transparent';
-    rows+='<div style="display:flex;justify-content:space-between;padding:3px 5px;border-radius:4px;background:'+bg+';margin-bottom:2px"><span style="color:var(--text2);font-size:9px;font-weight:700">'+tf.toUpperCase()+'</span><span style="color:'+col+';font-size:9px;font-weight:900">'+txt+'</span></div>';
+    var col=typeof score!=='undefined'?(score>18?'var(--green)':score<-18?'var(--red)':'var(--gold)'):'rgba(150,160,190,.4)';
+    var txt=typeof score!=='undefined'?(score>18?'▲ BUY':score<-18?'▼ SELL':'─ NEUT'):'...';
+    var sc=typeof score!=='undefined'?(score>0?'+':'')+score.toFixed(0):'';
+    var bg=typeof score!=='undefined'?(score>18?'rgba(0,240,122,.06)':score<-18?'rgba(255,45,85,.06)':'transparent'):'transparent';
+    // Highlight 1h/4h as HTF keys
+    var isHTF=tf==='1h'||tf==='4h';
+    // Check alignment with current signal
+    var aligned=false,opposed=false;
+    if(typeof score!=='undefined'&&curDir!=='n'){
+      aligned=(curDir==='buy'&&score>18)||(curDir==='sell'&&score<-18);
+      opposed=(curDir==='buy'&&score<-18)||(curDir==='sell'&&score>18);
+    }
+    var border=isHTF?(aligned?'border-left:2px solid var(--green);':opposed?'border-left:2px solid var(--red);':'border-left:2px solid rgba(255,200,50,.3);'):'';
+    rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;background:'+bg+';margin-bottom:2px;'+border+'">';
+    rows+='<span style="color:'+(isHTF?'var(--gold)':'rgba(180,190,220,.7)')+';font-size:9px;font-weight:'+(isHTF?'900':'600')+'">'+tf.toUpperCase()+'</span>';
+    rows+='<span style="display:flex;align-items:center;gap:4px"><span style="color:rgba(150,160,190,.5);font-size:8px">'+sc+'</span><span style="color:'+col+';font-size:9px;font-weight:900">'+txt+'</span>'+(aligned?'<span style="color:var(--green);font-size:8px">✔</span>':(opposed?'<span style="color:var(--red);font-size:8px">⛔</span>':''))+'</span>';
+    rows+='</div>';
   }
   el.innerHTML=rows;
 }
@@ -1099,7 +1154,11 @@ async function fetchMTFSignals(){
     }catch(e){}
   }
   updateMTFPanel();
+  doAI(); // re-run AI after MTF data is fresh
 }
+
+// Auto-refresh MTF every 5 minutes
+if(!window._mtfTimer)window._mtfTimer=setInterval(function(){if(S.dataReady)fetchMTFSignals();},300000);
 
 function playAlert(type){
   if(!S.soundEnabled)return;
@@ -1173,6 +1232,15 @@ function updateConfluencePanel(a){
   out+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;background:'+(a.volRatio>1.4?'rgba(0,240,122,.06)':a.volRatio<0.65?'rgba(255,45,85,.06)':'transparent')+';margin-bottom:2px">';
   out+='<span style="color:rgba(180,190,220,.7);font-size:9px;min-width:58px">Volume</span>';
   out+='<span style="color:'+vCol+';font-size:9px;font-weight:900">'+vIc+' <span style="opacity:.75;font-weight:400">'+a.volRatio.toFixed(2)+'x avg</span></span></div>';
+  // MTF row
+  var mtfSt=S&&S.mtfStatus||'unknown';
+  var mtfM=S&&S.mtfMsg||'loading...';
+  var mtfC=mtfSt==='aligned'?'var(--green)':mtfSt==='opposed'?'var(--red)':mtfSt==='warn'?'var(--gold)':'rgba(150,160,190,.5)';
+  var mtfI=mtfSt==='aligned'?'✔':mtfSt==='opposed'?'⛔':mtfSt==='warn'?'⚠':'−';
+  var mtfBg=mtfSt==='aligned'?'rgba(0,240,122,.06)':mtfSt==='opposed'?'rgba(255,45,85,.06)':mtfSt==='warn'?'rgba(255,200,50,.06)':'transparent';
+  out+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;background:'+mtfBg+';margin-bottom:2px;border-left:2px solid '+mtfC+'">';
+  out+='<span style="color:rgba(180,190,220,.7);font-size:9px;min-width:58px">HTF (1H/4H)</span>';
+  out+='<span style="color:'+mtfC+';font-size:9px;font-weight:900">'+mtfI+' <span style="opacity:.8;font-weight:400">'+mtfM.substring(0,22)+'</span></span></div>';
   if(a.filters&&a.filters.length){
     a.filters.forEach(function(f){
       out+='<div style="padding:3px 6px;background:rgba(255,200,50,.08);border-left:2px solid var(--gold);border-radius:3px;margin-bottom:2px;font-size:8px;color:var(--gold)">⚠ '+f+'</div>';
@@ -1775,7 +1843,7 @@ function drawFGGauge(){
 }
 
 // ==================== INIT ====================
-log('🚀 ProTrade AI v4.0 — 7-Check Confluence Engine online','var(--gold)');
+log('🚀 ProTrade AI v4.1 — Confluence + HTF Trend Filter online','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 log('💰 Paper balance: ₹10,000 | Auto trade: ON','var(--green)');
 loadSymbol();
