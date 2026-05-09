@@ -194,6 +194,33 @@ tr:hover td{background:rgba(61,142,255,.04)}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(37,53,85,.8);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(61,142,255,.4)}
+
+/* ========== SETTINGS MODAL ========== */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.modal-backdrop.open{display:flex}
+.modal{background:linear-gradient(145deg,var(--bg2) 0%,var(--bg1) 100%);border:1px solid var(--border2);border-radius:14px;padding:24px 28px;width:420px;max-width:calc(100vw - 32px);box-shadow:0 24px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06)}
+.modal-title{font-size:14px;font-weight:900;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.modal-sub{font-size:10px;color:var(--text2);margin-bottom:20px;letter-spacing:.3px}
+.modal-label{font-size:10px;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;display:block}
+.modal-input{width:100%;background:var(--bg0);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text);outline:none;transition:.2s;letter-spacing:.5px}
+.modal-input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,232,255,.12)}
+.modal-input::placeholder{color:var(--text3)}
+.modal-info{background:rgba(0,232,255,.06);border:1px solid rgba(0,232,255,.18);border-radius:7px;padding:10px 12px;font-size:9px;color:var(--cyan);margin-top:12px;line-height:1.7;letter-spacing:.2px}
+.modal-info a{color:var(--cyan);text-decoration:underline}
+.modal-status{font-size:9px;margin-top:8px;padding:6px 10px;border-radius:5px;display:none}
+.modal-status.ok{background:rgba(0,240,122,.1);color:var(--green);border:1px solid rgba(0,240,122,.25);display:block}
+.modal-status.err{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.25);display:block}
+.modal-btns{display:flex;gap:8px;margin-top:18px}
+.mbtn{flex:1;padding:9px;border-radius:7px;border:none;cursor:pointer;font-size:11px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:.8px;transition:.2s}
+.mbtn-save{background:linear-gradient(135deg,var(--cyan),#0099bb);color:#000;box-shadow:0 0 14px rgba(0,232,255,.25)}
+.mbtn-save:hover{box-shadow:0 0 22px rgba(0,232,255,.4)}
+.mbtn-clear{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.25)}
+.mbtn-clear:hover{background:rgba(255,45,85,.18)}
+.mbtn-close{background:var(--bg4);color:var(--text2);border:1px solid var(--border2)}
+.mbtn-close:hover{background:var(--bg3);color:var(--text)}
+.api-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:900;letter-spacing:.3px;cursor:pointer;transition:.2s}
+.api-badge.has-key{background:rgba(0,240,122,.12);color:var(--green);border:1px solid rgba(0,240,122,.3)}
+.api-badge.no-key{background:rgba(255,200,50,.1);color:var(--gold);border:1px solid rgba(255,200,50,.25)}
 </style>
 </head>
 <body>
@@ -214,7 +241,30 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn act" onclick="switchV('chart')" id="btnC">📈 Chart</button>
     <button class="hbtn" onclick="switchV('report')" id="btnR">📊 Report</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
+    <span class="api-badge no-key" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
     <button class="hbtn danger" onclick="resetAcc()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-backdrop" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-title">⚙ API Settings</div>
+    <div class="modal-sub">Configure your CoinGecko API key for real-time live data in India</div>
+    <label class="modal-label">CoinGecko API Key (Free — 30 calls/min)</label>
+    <input class="modal-input" id="geckoKeyInput" type="password" placeholder="CG-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <div id="modalStatus" class="modal-status"></div>
+    <div class="modal-info">
+      🌐 Get a FREE key at <a href="https://www.coingecko.com/en/api" target="_blank">coingecko.com/en/api</a><br>
+      ✅ Free tier: 30 calls/min — enough for live charts<br>
+      🔒 Key is saved only in your browser (localStorage) — never sent anywhere except CoinGecko<br>
+      📊 With key: real OHLCV candles + live price polling every 3s
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-save" onclick="saveGeckoKey()">✅ SAVE &amp; APPLY</button>
+      <button class="mbtn mbtn-clear" onclick="clearGeckoKey()">🗑 CLEAR</button>
+      <button class="mbtn mbtn-close" onclick="closeSettings()">✕ CLOSE</button>
+    </div>
   </div>
 </div>
 
@@ -433,6 +483,112 @@ const S = {
   lastSigSound:0
 };
 
+// ==================== COINGECKO API KEY ====================
+const GECKO_KEY_LS = 'protradeai_cgkey';
+
+function getGeckoKey(){return localStorage.getItem(GECKO_KEY_LS)||'';}
+
+function geckoHeaders(){
+  const k=getGeckoKey();
+  if(!k)return {};
+  // CoinGecko free demo key uses x-cg-demo-api-key header
+  return {'x-cg-demo-api-key':k};
+}
+
+function geckoUrl(path){
+  const k=getGeckoKey();
+  const base='https://api.coingecko.com/api/v3';
+  // Pro keys start with "CG-" and are 40+ chars — use pro subdomain
+  if(k&&k.startsWith('CG-')&&k.length>30){
+    return 'https://pro-api.coingecko.com/api/v3'+path;
+  }
+  return base+path;
+}
+
+function updateApiBadge(){
+  const b=document.getElementById('apiBadge');
+  if(!b)return;
+  const k=getGeckoKey();
+  if(k){
+    b.className='api-badge has-key';
+    b.textContent='🔑 CG: ACTIVE';
+    b.title='CoinGecko API Key configured — click to change';
+  } else {
+    b.className='api-badge no-key';
+    b.textContent='🔑 API KEY';
+    b.title='No CoinGecko API Key — click to add for better limits';
+  }
+}
+
+function openSettings(){
+  const m=document.getElementById('settingsModal');
+  const inp=document.getElementById('geckoKeyInput');
+  const st=document.getElementById('modalStatus');
+  inp.value=getGeckoKey();
+  st.className='modal-status';
+  st.textContent='';
+  m.classList.add('open');
+  setTimeout(()=>inp.focus(),120);
+}
+
+function closeSettings(){
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+async function saveGeckoKey(){
+  const inp=document.getElementById('geckoKeyInput');
+  const st=document.getElementById('modalStatus');
+  const key=inp.value.trim();
+  if(!key){
+    st.className='modal-status err';
+    st.textContent='⚠ Please enter a key, or click CLEAR to remove the existing one.';
+    return;
+  }
+  // Quick verify — ping /ping endpoint with the key
+  st.className='modal-status';
+  st.textContent='⏳ Verifying key...';
+  try{
+    const hdrs=key.startsWith('CG-')&&key.length>30
+      ?{'x-cg-pro-api-key':key}
+      :{'x-cg-demo-api-key':key};
+    const base=key.startsWith('CG-')&&key.length>30
+      ?'https://pro-api.coingecko.com/api/v3'
+      :'https://api.coingecko.com/api/v3';
+    const ctrl=new AbortController();
+    const to=setTimeout(()=>ctrl.abort(),5000);
+    const r=await fetch(base+'/ping',{headers:hdrs,signal:ctrl.signal});
+    clearTimeout(to);
+    if(r.ok||(r.status===429)){
+      localStorage.setItem(GECKO_KEY_LS,key);
+      st.className='modal-status ok';
+      st.textContent='✅ Key saved! CoinGecko will use this for all price & chart requests.';
+      updateApiBadge();
+      // Reload chart data using new key
+      setTimeout(()=>{closeSettings();loadSym();},1200);
+    } else {
+      const body=await r.json().catch(()=>({}));
+      st.className='modal-status err';
+      st.textContent='❌ Invalid key (HTTP '+r.status+'). Check your CoinGecko dashboard.';
+    }
+  }catch(e){
+    // Network error — save anyway (could just be CORS on ping)
+    localStorage.setItem(GECKO_KEY_LS,key);
+    st.className='modal-status ok';
+    st.textContent='✅ Key saved! (Could not verify online — will use on next request.)';
+    updateApiBadge();
+    setTimeout(()=>{closeSettings();loadSym();},1400);
+  }
+}
+
+function clearGeckoKey(){
+  localStorage.removeItem(GECKO_KEY_LS);
+  document.getElementById('geckoKeyInput').value='';
+  const st=document.getElementById('modalStatus');
+  st.className='modal-status ok';
+  st.textContent='🗑 Key cleared. Using CoinGecko public API (rate limited).';
+  updateApiBadge();
+}
+
 // ==================== API ENGINE (CORS-SAFE) ====================
 // Multiple endpoints - works in India without VPN
 // data-api.binance.vision is the public mirror — bypasses India geo-block
@@ -502,8 +658,8 @@ async function tryGecko(sym,n,tf){
     let days=tf==='1d'?90:tf==='4h'?30:tf==='1h'?14:tf==='15m'?3:tf==='5m'?2:1;
     let ctrl=new AbortController();
     let to=setTimeout(()=>ctrl.abort(),5000);
-    // Use OHLC endpoint for real candlestick data
-    let r=await fetch('https://api.coingecko.com/api/v3/coins/'+gid+'/ohlc?vs_currency=usd&days='+days,{signal:ctrl.signal});
+    // Use OHLC endpoint for real candlestick data — inject API key if set
+    let r=await fetch(geckoUrl('/coins/'+gid+'/ohlc?vs_currency=usd&days='+days),{signal:ctrl.signal,headers:geckoHeaders()});
     clearTimeout(to);
     if(r.ok){
       let d=await r.json();
@@ -516,13 +672,17 @@ async function tryGecko(sym,n,tf){
         // take last n candles
         if(candles.length>n)candles=candles.slice(-n);
         let pr=candles[candles.length-1].c;
-        log('✅ CoinGecko OHLC: $'+pr.toLocaleString()+' ('+candles.length+' real candles)','var(--cyan)');
-        S.apiSource='COINGECKO';
+        let src=getGeckoKey()?'CoinGecko+KEY':'CoinGecko';
+        log('✅ '+src+' OHLC: $'+pr.toLocaleString()+' ('+candles.length+' real candles)','var(--cyan)');
+        S.apiSource=getGeckoKey()?'CG+KEY':'COINGECKO';
         return candles;
       }
     }
     // Fallback: simple price → simulated candles
-    let r2=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+gid+'&vs_currencies=usd&include_24hr_change=true',{signal:new AbortController().signal});
+    let ctrl2=new AbortController();
+    let to2=setTimeout(()=>ctrl2.abort(),4000);
+    let r2=await fetch(geckoUrl('/simple/price?ids='+gid+'&vs_currencies=usd&include_24hr_change=true'),{signal:ctrl2.signal,headers:geckoHeaders()});
+    clearTimeout(to2);
     if(r2.ok){
       let d2=await r2.json();
       let price=d2[gid]&&d2[gid].usd;
@@ -571,7 +731,7 @@ async function tryGeckoPrice(sym){
     let gid=GECKO_IDS[sym]||'bitcoin';
     let ctrl=new AbortController();
     let to=setTimeout(()=>ctrl.abort(),4000);
-    let r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+gid+'&vs_currencies=usd',{signal:ctrl.signal});
+    let r=await fetch(geckoUrl('/simple/price?ids='+gid+'&vs_currencies=usd'),{signal:ctrl.signal,headers:geckoHeaders()});
     clearTimeout(to);
     if(r.ok){let d=await r.json();return d[gid]&&d[gid].usd;}
   }catch(e){}
@@ -1880,9 +2040,19 @@ function drawFGGauge(){
 }
 
 // ==================== INIT ====================
+// Alias for settings modal callbacks
+function loadSym(){loadSymbol();}
+
 log('🚀 ProTrade AI v4.1 — Confluence + HTF Trend Filter online','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 log('💰 Paper balance: ₹10,000 | Auto trade: ON','var(--green)');
+
+// Show API key badge state on load
+updateApiBadge();
+if(getGeckoKey()){
+  log('🔑 CoinGecko API key loaded from storage — enhanced rate limits active','var(--cyan)');
+}
+
 loadSymbol();
 setInterval(()=>{if(S.dataReady)updateUI();},2000);
 fetchFearGreed();
