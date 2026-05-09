@@ -201,7 +201,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v3.0</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.0</sub></div>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
     <div class="chip"><div class="cl">BALANCE</div><div class="cv" id="balEl">₹10,000</div></div>
@@ -332,6 +332,11 @@ tr:hover td{background:rgba(61,142,255,.04)}
       <div id="opPos"><div style="color:var(--text2);font-size:10px;text-align:center;padding:10px 0">No open positions</div></div>
     </div>
 
+    <div class="rp-sec" style="padding-bottom:10px">
+      <h4 style="display:flex;justify-content:space-between;align-items:center"><span>🤖 AI CONFLUENCE</span><span style="font-size:8px;color:rgba(150,160,190,.5);font-weight:400;letter-spacing:.5px">7-CHECK SYSTEM</span></h4>
+      <div id="confluencePanel" style="min-height:50px"><div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:12px">⟳ Analyzing market...</div></div>
+    </div>
+
     <div class="rp-sec">
       <h4>📊 AI INDICATOR SCORES</h4>
       <div class="mrow"><span class="ml">RSI(14)</span><div class="mbar"><div class="mfill" id="m-rsi" style="width:50%;background:var(--gold)"></div></div><span class="mv" id="mv-rsi" style="color:var(--gold)">--</span></div>
@@ -390,7 +395,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v3.0 | BB+Supertrend+MTF+TrailSL | 20 Pairs | Spot Only</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.0 | 7-Check Confluence AI | Grade A+/A/B/C | Smart Filters</span>
 </div>
 
 </div>
@@ -792,103 +797,244 @@ function calcInds(){
   };
 }
 
-// ==================== AI ANALYSIS ====================
+// ==================== SMART AI ENGINE v4 — 7-Check Confluence ====================
 function analyze(candles,curPrice){
-  if(!candles||candles.length<20)return null;
-  let ind={rsi:calcRSI(candles),macd:calcMACD(candles),ma20:calcMA(candles,20),ma50:calcMA(candles,50),atr:calcATR(candles),stoch:calcStoch(candles)};
-  let n=candles.length-1;
-  let pr=curPrice||candles[n].c;
-  let rsiV=ind.rsi[n]||50,macdV=ind.macd[n]||{m:0,s:0,h:0};
-  let ma20V=ind.ma20[n],ma50V=ind.ma50[n],atrV=ind.atr[n]||pr*0.01,stochV=ind.stoch[n]||50;
-  let score=0,reasons=[],patterns=[];
+  if(!candles||candles.length<30)return null;
+  var n=candles.length-1;
+  var pr=curPrice||candles[n].c;
 
-  if(rsiV<28){score+=30;reasons.push('RSI Oversold ('+rsiV.toFixed(1)+')')}
-  else if(rsiV<42){score+=15;reasons.push('RSI Bullish')}
-  else if(rsiV>72){score-=30;reasons.push('RSI Overbought ('+rsiV.toFixed(1)+')')}
-  else if(rsiV>58){score-=15;reasons.push('RSI Bearish')}
+  // Compute indicators
+  var rsiArr=calcRSI(candles),macdArr=calcMACD(candles);
+  var ma20Arr=calcMA(candles,20),ma50Arr=calcMA(candles,50),ma200Arr=calcMA(candles,200);
+  var atrArr=calcATR(candles),stochArr=calcStoch(candles);
+  var bbArr=calcBB(candles,20,2),stArr=calcSupertrend(candles,10,3);
 
-  if(macdV.h>0&&macdV.m>0){score+=25;reasons.push('MACD Bull Cross')}
-  else if(macdV.h<0&&macdV.m<0){score-=25;reasons.push('MACD Bear Cross')}
-  else if(macdV.h>0)score+=8;else score-=8;
+  var rsiV=rsiArr[n]||50,macdV=macdArr[n]||{m:0,s:0,h:0},macdPrev=macdArr[n-1]||{m:0,s:0,h:0};
+  var ma20V=ma20Arr[n],ma50V=ma50Arr[n],ma200V=ma200Arr[n];
+  var atrV=atrArr[n]||pr*0.01,stochV=stochArr[n]||50,stochPrev=stochArr[n-1]||50;
+  var bbV=bbArr[n],stV=stArr[n],stPrev2=stArr[n-1];
 
+  // Volume
+  var vol20=candles.slice(-20).reduce(function(a,c){return a+c.v;},0)/20||1;
+  var volRatio=candles[n].v/vol20;
+
+  // Candle patterns
+  var patterns=[],cur=candles[n],prev=candles[n-1],prev2=candles[n>1?n-2:0];
+  var cb=Math.abs(cur.c-cur.o),pb=Math.abs(prev.c-prev.o);
+  var lw=Math.min(cur.o,cur.c)-cur.l,uw=cur.h-Math.max(cur.o,cur.c),rng=cur.h-cur.l||0.001;
+  if(cur.c>cur.o&&prev.c<prev.o&&cb>pb*1.05)patterns.push({n:'Bullish Engulfing',t:'bull',w:25});
+  if(cur.c<cur.o&&prev.c>prev.o&&cb>pb*1.05)patterns.push({n:'Bearish Engulfing',t:'bear',w:25});
+  if(lw>cb*2&&uw<cb&&cur.c>cur.o)patterns.push({n:'Hammer',t:'bull',w:18});
+  if(uw>cb*2&&lw<cb&&cur.c<cur.o)patterns.push({n:'Shooting Star',t:'bear',w:18});
+  if(cb<rng*0.12&&lw>rng*0.35&&uw>rng*0.35)patterns.push({n:'Doji',t:'neu',w:0});
+  if(cb>rng*0.82&&cur.c>cur.o)patterns.push({n:'Bull Marubozu',t:'bull',w:14});
+  if(cb>rng*0.82&&cur.c<cur.o)patterns.push({n:'Bear Marubozu',t:'bear',w:14});
+  if(lw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bull Pinbar',t:'bull',w:20});
+  if(uw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bear Pinbar',t:'bear',w:20});
+  var p2b=Math.abs(prev2.c-prev2.o);
+  if(prev2.c<prev2.o&&prev.c<prev.o&&cur.c>cur.o&&cur.c>prev2.o)patterns.push({n:'Morning Star',t:'bull',w:28});
+  if(prev2.c>prev2.o&&prev.c>prev.o&&cur.c<cur.o&&cur.c<prev2.o)patterns.push({n:'Evening Star',t:'bear',w:28});
+
+  // 7-CHECK CONFLUENCE SYSTEM
+  var checks={};
+
+  // C1: RSI
+  if(rsiV<30)checks.rsi={v:1,lbl:'RSI Oversold ('+rsiV.toFixed(0)+')',sc:28};
+  else if(rsiV>70)checks.rsi={v:-1,lbl:'RSI Overbought ('+rsiV.toFixed(0)+')',sc:-28};
+  else if(rsiV<45)checks.rsi={v:1,lbl:'RSI Bullish ('+rsiV.toFixed(0)+')',sc:12};
+  else if(rsiV>55)checks.rsi={v:-1,lbl:'RSI Bearish ('+rsiV.toFixed(0)+')',sc:-12};
+  else checks.rsi={v:0,lbl:'RSI Neutral ('+rsiV.toFixed(0)+')',sc:0};
+
+  // C2: MACD
+  var mCross=macdV.h>0&&macdPrev.h<=0,mCrossD=macdV.h<0&&macdPrev.h>=0;
+  if(macdV.h>0&&macdV.m>0)checks.macd={v:1,lbl:mCross?'MACD Cross UP!':'MACD Bullish',sc:mCross?30:18};
+  else if(macdV.h<0&&macdV.m<0)checks.macd={v:-1,lbl:mCrossD?'MACD Cross DN!':'MACD Bearish',sc:mCrossD?-30:-18};
+  else if(macdV.h>0)checks.macd={v:1,lbl:'MACD Hist +',sc:8};
+  else checks.macd={v:-1,lbl:'MACD Hist -',sc:-8};
+
+  // C3: Moving Averages
+  var maTrend=0,maLbl='MA Mixed',maSc=0;
   if(ma20V&&ma50V){
-    if(pr>ma20V&&pr>ma50V){score+=15;reasons.push('Above MA20/50')}
-    else if(pr<ma20V&&pr<ma50V){score-=15;reasons.push('Below MA20/50')}
-    if(ma20V>ma50V){score+=8;reasons.push('Golden Cross Zone')}
-    else{score-=8;reasons.push('Death Cross Zone')}
+    if(pr>ma20V&&pr>ma50V&&ma20V>ma50V){maTrend=1;maLbl='Golden Cross zone';maSc=20;}
+    else if(pr>ma20V&&pr>ma50V){maTrend=1;maLbl='Above MA20+50';maSc=14;}
+    else if(pr<ma20V&&pr<ma50V&&ma20V<ma50V){maTrend=-1;maLbl='Death Cross zone';maSc=-20;}
+    else if(pr<ma20V&&pr<ma50V){maTrend=-1;maLbl='Below MA20+50';maSc=-14;}
+    if(ma200V&&maTrend===1&&pr>ma200V){maLbl+=' +MA200';maSc+=4;}
+    if(ma200V&&maTrend===-1&&pr<ma200V){maLbl+=' -MA200';maSc-=4;}
   }
-  if(stochV<20){score+=15;reasons.push('Stoch Oversold')}
-  else if(stochV>80){score-=15;reasons.push('Stoch Overbought')}
+  checks.ma={v:maTrend,lbl:maLbl,sc:maSc};
 
-  let prev=candles[n-1],cur=candles[n];
-  if(prev&&cur){
-    let pb=Math.abs(prev.c-prev.o),cb=Math.abs(cur.c-cur.o);
-    if(cur.c>cur.o&&prev.c<prev.o&&cb>pb*1.1){score+=20;patterns.push({n:'Bullish Engulfing',t:'bull'})}
-    if(cur.c<cur.o&&prev.c>prev.o&&cb>pb*1.1){score-=20;patterns.push({n:'Bearish Engulfing',t:'bear'})}
-    let lw=Math.min(cur.o,cur.c)-cur.l,uw=cur.h-Math.max(cur.o,cur.c);
-    if(lw>cb*2&&uw<cb*0.5){score+=12;patterns.push({n:'Hammer',t:'bull'})}
-    if(uw>cb*2&&lw<cb*0.5&&cur.c<cur.o){score-=12;patterns.push({n:'Shooting Star',t:'bear'})}
-    if(cb<(cur.h-cur.l)*0.1)patterns.push({n:'Doji',t:'neu'});
-    if(cb>(cur.h-cur.l)*0.85&&cur.c>cur.o){score+=10;patterns.push({n:'Bullish Marubozu',t:'bull'})}
-    if(cb>(cur.h-cur.l)*0.85&&cur.c<cur.o){score-=10;patterns.push({n:'Bearish Marubozu',t:'bear'})}
-  }
+  // C4: Stochastic
+  var stCrossUp=stochV>20&&stochPrev<=20,stCrossDn=stochV<80&&stochPrev>=80;
+  if(stochV<22)checks.stoch={v:1,lbl:stCrossUp?'Stoch Cross UP!':'Stoch Oversold',sc:stCrossUp?22:16};
+  else if(stochV>78)checks.stoch={v:-1,lbl:stCrossDn?'Stoch Cross DN!':'Stoch Overbought',sc:stCrossDn?-22:-16};
+  else if(stochV<45)checks.stoch={v:1,lbl:'Stoch Bullish',sc:8};
+  else if(stochV>55)checks.stoch={v:-1,lbl:'Stoch Bearish',sc:-8};
+  else checks.stoch={v:0,lbl:'Stoch Neutral',sc:0};
 
-  var avgV=candles.slice(-20).reduce(function(a,c){return a+c.v;},0)/20;
-  if(candles[n].v>avgV*1.5)reasons.push('Volume Surge');
-  if(candles[n].v>avgV*2.5){score+=8;reasons.push('Volume Explosion');}
-  var bbArr=calcBB(candles,20,2),bbV=bbArr[n];
-  if(bbV){if(pr<bbV.l){score+=18;reasons.push('BB Lower Touch');}else if(pr>bbV.u){score-=18;reasons.push('BB Upper Touch');}if(bbV.bw<0.02)reasons.push('BB Squeeze');}
-  var stArr=calcSupertrend(candles,10,3),stV=stArr[n],stPrev=stArr[n-1];
-  if(stV&&stPrev){if(stV.bull){score+=12;reasons.push('Supertrend BULL');}else{score-=12;reasons.push('Supertrend BEAR');}if(stV.bull&&!stPrev.bull){score+=15;reasons.push('ST Buy Cross ▲');}else if(!stV.bull&&stPrev.bull){score-=15;reasons.push('ST Sell Cross ▼');}}
+  // C5: Bollinger Bands
+  if(bbV){
+    if(pr<=bbV.l)checks.bb={v:1,lbl:'BB Lower Touch!',sc:22};
+    else if(pr>=bbV.u)checks.bb={v:-1,lbl:'BB Upper Touch!',sc:-22};
+    else if(pr>bbV.m)checks.bb={v:1,lbl:'Above BB Mid',sc:8};
+    else checks.bb={v:-1,lbl:'Below BB Mid',sc:-8};
+  }else checks.bb={v:0,lbl:'BB loading',sc:0};
 
-  score=Math.max(-100,Math.min(100,score));
-  let conf=Math.min(95,42+Math.abs(score)*0.68);
-  let isBuy=score>20,isSell=score<-20;
-  let sl=isBuy?pr-atrV*1.8:pr+atrV*1.8;
-  let tp1=isBuy?pr+atrV*1.0:pr-atrV*1.0;
-  let tp2=isBuy?pr+atrV*2.2:pr-atrV*2.2;
-  let tp3=isBuy?pr+atrV*3.5:pr-atrV*3.5;
-  let tp4=isBuy?pr+atrV*5.0:pr-atrV*5.0;
-  let rr=Math.abs(tp2-pr)/Math.abs(pr-sl);
-  let hi20=Math.max(...candles.slice(-20).map(c=>c.h));
-  let lo20=Math.min(...candles.slice(-20).map(c=>c.l));
-  let hi5=Math.max(...candles.slice(-5).map(c=>c.h));
-  let lo5=Math.min(...candles.slice(-5).map(c=>c.l));
-  return{score,conf,isBuy,isSell,entry:pr,sl,tp1,tp2,tp3,tp4,rr,reasons,patterns,atrV,rsiV,macdV,stochV,ma20V,ma50V,pr,hi5,lo5,hi20,lo20};
+  // C6: Supertrend
+  if(stV&&stPrev2){
+    var sCross=stV.bull&&!stPrev2.bull,sCrossDn=!stV.bull&&stPrev2.bull;
+    if(stV.bull)checks.st={v:1,lbl:sCross?'ST Buy Cross ▲':'Supertrend Bull',sc:sCross?28:14};
+    else checks.st={v:-1,lbl:sCrossDn?'ST Sell Cross ▼':'Supertrend Bear',sc:sCrossDn?-28:-14};
+  }else checks.st={v:0,lbl:'ST loading',sc:0};
+
+  // C7: Candlestick Pattern
+  var bullPats=patterns.filter(function(p){return p.t==='bull';});
+  var bearPats=patterns.filter(function(p){return p.t==='bear';});
+  var bBull=bullPats.reduce(function(a,p){return p.w>a?p.w:a;},0);
+  var bBear=bearPats.reduce(function(a,p){return p.w>a?p.w:a;},0);
+  if(bBull>0&&bBull>=bBear){var bp=bullPats.find(function(p){return p.w===bBull;});checks.pattern={v:1,lbl:bp.n,sc:Math.min(bBull,22)};}
+  else if(bBear>0){var brp=bearPats.find(function(p){return p.w===bBear;});checks.pattern={v:-1,lbl:brp.n,sc:-Math.min(bBear,22)};}
+  else checks.pattern={v:0,lbl:'No pattern',sc:0};
+
+  // Count confluence
+  var ckVals=Object.values(checks);
+  var bullCount=ckVals.filter(function(c){return c.v===1;}).length;
+  var bearCount=ckVals.filter(function(c){return c.v===-1;}).length;
+  var rawScore=ckVals.reduce(function(a,c){return a+c.sc;},0);
+
+  // Volume bonus/penalty
+  var volBonus=0,volLbl='';
+  if(volRatio>2.0){volBonus=rawScore>0?14:-14;volLbl='Vol Explosion '+volRatio.toFixed(1)+'x';}
+  else if(volRatio>1.4){volBonus=rawScore>0?7:-7;volLbl='Vol Surge '+volRatio.toFixed(1)+'x';}
+  else if(volRatio<0.6){volLbl='Low vol '+volRatio.toFixed(2)+'x';}
+  var totalScore=Math.max(-100,Math.min(100,rawScore+volBonus));
+
+  // S/R levels
+  var hi20=Math.max.apply(null,candles.slice(-20).map(function(c){return c.h;}));
+  var lo20=Math.min.apply(null,candles.slice(-20).map(function(c){return c.l;}));
+  var hi5=Math.max.apply(null,candles.slice(-5).map(function(c){return c.h;}));
+  var lo5=Math.min.apply(null,candles.slice(-5).map(function(c){return c.l;}));
+
+  // SMART FILTERS — gate that blocks low-quality trades
+  var filters=[];
+  var distToRes=(hi20-pr)/pr, distToSup=(pr-lo20)/pr;
+  if(totalScore>0&&distToRes<0.005)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
+  if(totalScore<0&&distToSup<0.005)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
+  if(Math.abs(totalScore)>20&&volRatio<0.65)filters.push('Low volume — no confirmation');
+  if(totalScore>0&&rsiV>76)filters.push('RSI too high to buy ('+rsiV.toFixed(0)+')');
+  if(totalScore<0&&rsiV<24)filters.push('RSI too low to sell ('+rsiV.toFixed(0)+')');
+  var minConf=totalScore>0?bullCount:bearCount;
+  if(Math.abs(totalScore)>20&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
+  var isBlocked=filters.length>0;
+
+  // SIGNAL DECISION — much stricter thresholds
+  var isBuy=totalScore>=35&&bullCount>=4&&!isBlocked;
+  var isBuyWeak=totalScore>=22&&bullCount>=3&&!isBlocked;
+  var isSell=totalScore<=-35&&bearCount>=4&&!isBlocked;
+  var isSellWeak=totalScore<=-22&&bearCount>=3&&!isBlocked;
+
+  // Confidence
+  var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
+  if(volRatio>1.3)confBase+=5;
+  if(mCross||mCrossD)confBase+=5;
+  var conf=Math.min(94,confBase);
+
+  // Grade
+  var grade='D';
+  if(Math.abs(totalScore)>=60&&minConf>=5&&volRatio>1.2)grade='A+';
+  else if(Math.abs(totalScore)>=45&&minConf>=4)grade='A';
+  else if(Math.abs(totalScore)>=30&&minConf>=4)grade='B';
+  else if(Math.abs(totalScore)>=20&&minConf>=3)grade='C';
+
+  // TP/SL (ATR-based + S/R aware)
+  var dir=totalScore>0?1:-1;
+  var sl=pr-dir*atrV*2.0;
+  var tp1=pr+dir*atrV*1.2;
+  var tp2=totalScore>0?Math.min(pr+atrV*3.0,hi20*0.998):Math.max(pr-atrV*3.0,lo20*1.002);
+  var tp3=pr+dir*atrV*4.5;
+  var tp4=pr+dir*atrV*6.5;
+  var rr=Math.abs(tp2-pr)/Math.abs(pr-sl)||1;
+
+  // Reasons list
+  var reasons=[];
+  ckVals.forEach(function(c){if(c.v!==0)reasons.push(c.lbl);});
+  if(volLbl)reasons.push(volLbl);
+  if(filters.length)reasons.push('⚠ '+filters[0]);
+
+  return{
+    score:totalScore,conf:conf,grade:grade,
+    isBuy:isBuy,isSell:isSell,isBuyWeak:isBuyWeak,isSellWeak:isSellWeak,
+    isBlocked:isBlocked,filters:filters,
+    bullCount:bullCount,bearCount:bearCount,checks:checks,volRatio:volRatio,
+    entry:pr,sl:sl,tp1:tp1,tp2:tp2,tp3:tp3,tp4:tp4,rr:rr,
+    reasons:reasons,patterns:patterns,
+    atrV:atrV,rsiV:rsiV,macdV:macdV,stochV:stochV,
+    ma20V:ma20V,ma50V:ma50V,ma200V:ma200V,pr:pr,
+    hi5:hi5,lo5:lo5,hi20:hi20,lo20:lo20
+  };
 }
 
 function doAI(){
-  let a=analyze(S.candles,S.curPrice);
+  var prevA=S.lastA;
+  var a=analyze(S.candles,S.curPrice);
   if(!a)return;
   S.lastA=a;
 
-  let sig=document.getElementById('aiSig'),conf=document.getElementById('aiConf'),btn=document.getElementById('aiBtn');
-  document.getElementById('aiSymL').textContent='Analyzing '+S.sym;
+  var sig=document.getElementById('aiSig'),conf=document.getElementById('aiConf'),btn=document.getElementById('aiBtn');
+  document.getElementById('aiSymL').textContent=S.sym+' AI v4';
 
-  var prevSigState=S.lastA?(S.lastA.isBuy?'buy':S.lastA.isSell?'sell':'neutral'):'neutral';
-  if(a.score>=25){sig.textContent='⬆ STRONG BUY';sig.style.color='var(--green)';btn.className='ai-btn btn-buy';btn.textContent='▲ EXECUTE BUY';if(S.auto)execTrade(a,true);if(prevSigState!=='buy')playAlert('buy');}
-  else if(a.score>=12){sig.textContent='↗ BUY';sig.style.color='#69f0ae';btn.className='ai-btn btn-buy';btn.textContent='▲ BUY SIGNAL';if(S.auto&&a.conf>58)execTrade(a,true);if(prevSigState!=='buy')playAlert('buy');}
-  else if(a.score<=-25){sig.textContent='⬇ STRONG SELL';sig.style.color='var(--red)';btn.className='ai-btn btn-sell';btn.textContent='▼ EXECUTE SELL';if(S.auto)execTrade(a,true);if(prevSigState!=='sell')playAlert('sell');}
-  else if(a.score<=-12){sig.textContent='↘ SELL';sig.style.color='#ff5252';btn.className='ai-btn btn-sell';btn.textContent='▼ SELL SIGNAL';if(S.auto&&a.conf>58)execTrade(a,true);if(prevSigState!=='sell')playAlert('sell');}
-  else{sig.textContent='⟳ NEUTRAL';sig.style.color='var(--gold)';btn.className='ai-btn btn-wait';btn.textContent='⟳ WAIT...';}  updateMTFPanel();
+  var prevDir=prevA?(prevA.isBuy||prevA.isBuyWeak?'buy':prevA.isSell||prevA.isSellWeak?'sell':'n'):'n';
+  var gCol=a.grade==='A+'?'#00f07a':a.grade==='A'?'#69f0ae':a.grade==='B'?'#00e8ff':a.grade==='C'?'#ffc832':'#555';
+  var gbadge='<span style="font-size:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:3px;padding:1px 5px;color:'+gCol+';margin-left:5px">'+a.grade+'</span>';
 
-  var fgAdj=FG.value<=25?'🔴 Fear':FG.value<=45?'🟠 Fear':FG.value<=55?'🟡 Neut':FG.value<=75?'🟢 Greed':'🟢 Greed';
-  conf.textContent='Score: '+(a.score>0?'+':'')+a.score.toFixed(0)+' | Conf: '+a.conf.toFixed(0)+'% | '+fgAdj;
+  if(a.isBuy){
+    sig.innerHTML='⬆ STRONG BUY'+gbadge; sig.style.color='var(--green)';
+    btn.className='ai-btn btn-buy'; btn.textContent='▲ EXECUTE BUY — '+a.bullCount+'/7';
+    if(S.auto&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
+  }else if(a.isBuyWeak){
+    sig.innerHTML='↗ BUY'+gbadge; sig.style.color='#69f0ae';
+    btn.className='ai-btn btn-buy'; btn.textContent='▲ BUY — '+a.bullCount+'/7 confirm';
+    if(S.auto&&a.conf>68&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
+  }else if(a.isSell){
+    sig.innerHTML='⬇ STRONG SELL'+gbadge; sig.style.color='var(--red)';
+    btn.className='ai-btn btn-sell'; btn.textContent='▼ EXECUTE SELL — '+a.bearCount+'/7';
+    if(S.auto&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
+  }else if(a.isSellWeak){
+    sig.innerHTML='↘ SELL'+gbadge; sig.style.color='#ff5252';
+    btn.className='ai-btn btn-sell'; btn.textContent='▼ SELL — '+a.bearCount+'/7 confirm';
+    if(S.auto&&a.conf>68&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
+  }else if(a.isBlocked&&Math.abs(a.score)>22){
+    sig.innerHTML=(a.score>0?'⬆':'⬇')+' FILTERED'+gbadge; sig.style.color='var(--gold)';
+    btn.className='ai-btn btn-wait';
+    btn.textContent='⚠ '+(a.filters[0]||'Filter active').substring(0,30);
+  }else{
+    sig.innerHTML='⏳ WAIT'+gbadge; sig.style.color='var(--gold)';
+    btn.className='ai-btn btn-wait'; btn.textContent='⟳ Waiting for confluence...';
+  }
+  updateMTFPanel();
+
+  var cn=Math.max(a.bullCount,a.bearCount);
+  var fgE=FG.value<=35?'🔴':FG.value<=55?'🟡':'🟢';
+  conf.textContent='Score '+(a.score>0?'+':'')+a.score.toFixed(0)+' │ '+cn+'/7 conf │ '+fgE+' F&G '+FG.value;
 
   setM('rsi',a.rsiV<30?85:a.rsiV>70?15:50,a.rsiV<30?'var(--green)':a.rsiV>70?'var(--red)':'var(--gold)',a.rsiV.toFixed(0));
   setM('macd',a.macdV.h>0?75:25,a.macdV.h>0?'var(--green)':'var(--red)',a.macdV.h>0?'BUL':'BEA');
   setM('ema',a.ma20V&&a.pr>a.ma20V?70:30,a.ma20V&&a.pr>a.ma20V?'var(--green)':'var(--red)',a.ma20V&&a.pr>a.ma20V?'BUL':'BEA');
   setM('stoch',a.stochV<20?85:a.stochV>80?15:50,a.stochV<20?'var(--green)':a.stochV>80?'var(--red)':'var(--gold)',a.stochV.toFixed(0));
-  let cv=S.candles.length?S.candles[S.candles.length-1].v:0;
-  let av=S.candles.slice(-20).reduce((x,c)=>x+c.v,0)/20||1;
-  setM('vol',Math.min(100,cv/av*50),'var(--cyan)',cv>av*1.3?'HIGH':'AVG');
+  var cv=S.candles.length?S.candles[S.candles.length-1].v:0;
+  var av2=S.candles.slice(-20).reduce(function(x,c){return x+c.v;},0)/20||1;
+  setM('vol',Math.min(100,cv/av2*50),'var(--cyan)',cv>av2*1.3?'HIGH':'AVG');
+  updateConfluencePanel(a);
 
   // Signal box
   let sb=document.getElementById('sigBox');
-  if(a.isBuy||a.isSell){
-    sb.className='sig-box '+(a.isBuy?'buy':'sell');sb.style.display='block';
-    document.getElementById('sigHd').textContent=a.isBuy?'● BUY':'● SELL';
-    document.getElementById('sigHd').style.color=a.isBuy?'var(--green)':'var(--red)';
+  if(a.isBuy||a.isSell||a.isBuyWeak||a.isSellWeak){
+    var isB=a.isBuy||a.isBuyWeak;
+    sb.className='sig-box '+(isB?'buy':'sell');sb.style.display='block';
+    var sigDir=a.isBuy||a.isBuyWeak?'BUY':'SELL';
+    var sigCnt=a.isBuy||a.isBuyWeak?a.bullCount:a.bearCount;
+    document.getElementById('sigHd').innerHTML='● '+sigDir+'<span style="font-size:8px;font-weight:400;margin-left:6px;opacity:.7">'+sigCnt+'/7 confirm · Grade '+a.grade+'</span>';
+    document.getElementById('sigHd').style.color=(a.isBuy||a.isBuyWeak)?'var(--green)':'var(--red)';
     document.getElementById('siE').textContent=fmt(a.entry);
     document.getElementById('siSL').textContent=fmt(a.sl);
     document.getElementById('siT1').textContent=fmt(a.tp1);
@@ -896,7 +1042,7 @@ function doAI(){
     document.getElementById('siT3').textContent=fmt(a.tp3);
     document.getElementById('siT4').textContent=fmt(a.tp4);
     document.getElementById('siRR').textContent='1:'+a.rr.toFixed(2);
-    document.getElementById('siCF').textContent=a.conf.toFixed(0)+'%';
+    document.getElementById('siCF').textContent=a.conf.toFixed(0)+'% · '+a.grade;
   } else sb.style.display='none';
 
   // Patterns
@@ -1005,6 +1151,48 @@ function drawEquityCurve(){
   var last=hist[hist.length-1].v,pct=((last-S.startBal)/S.startBal*100);
   ctx.fillStyle=profit?'#00f07a':'#ff2d55';ctx.font='bold 9px JetBrains Mono,Courier';ctx.textAlign='right';ctx.fillText((pct>=0?'+':'')+pct.toFixed(2)+'%',W-3,12);
   ctx.fillStyle='rgba(104,120,160,.7)';ctx.font='8px Courier';ctx.textAlign='left';ctx.fillText('Balance',3,12);
+}
+
+
+function updateConfluencePanel(a){
+  var el=document.getElementById('confluencePanel');if(!el)return;
+  var names={rsi:'RSI',macd:'MACD',ma:'MA Trend',stoch:'Stoch',bb:'Bollinger',st:'Supertrend',pattern:'Pattern'};
+  var out='';
+  Object.keys(names).forEach(function(k){
+    var c=a.checks&&a.checks[k];if(!c)return;
+    var col=c.v===1?'var(--green)':c.v===-1?'var(--red)':'rgba(150,160,190,.5)';
+    var ic=c.v===1?'✔':c.v===-1?'✘':'−';
+    var bg=c.v===1?'rgba(0,240,122,.06)':c.v===-1?'rgba(255,45,85,.06)':'transparent';
+    out+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;background:'+bg+';margin-bottom:2px">';
+    out+='<span style="color:rgba(180,190,220,.7);font-size:9px;min-width:58px">'+names[k]+'</span>';
+    out+='<span style="color:'+col+';font-size:9px;font-weight:900;text-align:right">'+ic+' <span style="opacity:.75;font-weight:400">'+c.lbl.substring(0,20)+'</span></span>';
+    out+='</div>';
+  });
+  var vCol=a.volRatio>1.4?'var(--green)':a.volRatio<0.65?'var(--red)':'rgba(150,160,190,.5)';
+  var vIc=a.volRatio>1.4?'✔':a.volRatio<0.65?'⚠':'−';
+  out+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;background:'+(a.volRatio>1.4?'rgba(0,240,122,.06)':a.volRatio<0.65?'rgba(255,45,85,.06)':'transparent')+';margin-bottom:2px">';
+  out+='<span style="color:rgba(180,190,220,.7);font-size:9px;min-width:58px">Volume</span>';
+  out+='<span style="color:'+vCol+';font-size:9px;font-weight:900">'+vIc+' <span style="opacity:.75;font-weight:400">'+a.volRatio.toFixed(2)+'x avg</span></span></div>';
+  if(a.filters&&a.filters.length){
+    a.filters.forEach(function(f){
+      out+='<div style="padding:3px 6px;background:rgba(255,200,50,.08);border-left:2px solid var(--gold);border-radius:3px;margin-bottom:2px;font-size:8px;color:var(--gold)">⚠ '+f+'</div>';
+    });
+  }
+  var total=8,bull=a.bullCount,bear=a.bearCount;
+  var pct=Math.round((bull/(bull+bear||1))*100);
+  var barCol=bull>bear?'var(--green)':bear>bull?'var(--red)':'var(--gold)';
+  var gCol=a.grade==='A+'?'#00f07a':a.grade==='A'?'#69f0ae':a.grade==='B'?'#00e8ff':a.grade==='C'?'#ffc832':'#555';
+  out+='<div style="margin-top:5px;padding-top:4px;border-top:1px solid var(--border)">';
+  out+='<div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:3px">';
+  out+='<span style="color:var(--green)">▲ '+bull+' bull</span>';
+  out+='<span style="color:'+gCol+';font-weight:900;font-size:10px">Grade: '+a.grade+'</span>';
+  out+='<span style="color:var(--red)">▼ '+bear+' bear</span></div>';
+  out+='<div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">';
+  out+='<div style="height:100%;width:'+pct+'%;background:'+barCol+';border-radius:3px;transition:width .6s ease"></div></div>';
+  out+='<div style="font-size:8px;color:rgba(150,160,190,.6);margin-top:3px;text-align:center">';
+  out+=(a.isBuy||a.isSell?'✔ Trade signal active':(a.isBuyWeak||a.isSellWeak)?'⚠ Weak signal — use caution':a.isBlocked&&Math.abs(a.score)>20?'⛔ Signal blocked by filter':'⏳ Waiting for setup...');
+  out+='</div></div>';
+  el.innerHTML=out;
 }
 
 function setM(id,pct,col,lbl){
@@ -1587,7 +1775,7 @@ function drawFGGauge(){
 }
 
 // ==================== INIT ====================
-log('🚀 ProTrade AI v3.0 starting...','var(--gold)');
+log('🚀 ProTrade AI v4.0 — 7-Check Confluence Engine online','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 log('💰 Paper balance: ₹10,000 | Auto trade: ON','var(--green)');
 loadSymbol();
