@@ -435,20 +435,23 @@ const S = {
 
 // ==================== API ENGINE (CORS-SAFE) ====================
 // Multiple endpoints - works in India without VPN
+// data-api.binance.vision is the public mirror — bypasses India geo-block
 const ENDPOINTS = [
+  'https://data-api.binance.vision/api/v3',
   'https://api.binance.com/api/v3',
   'https://api1.binance.com/api/v3',
   'https://api2.binance.com/api/v3',
   'https://api3.binance.com/api/v3',
 ];
 const WS_ENDPOINTS = [
+  'wss://data-stream.binance.vision/ws',
   'wss://stream.binance.com:9443/ws',
   'wss://stream.binance.com:443/ws',
   'wss://stream1.binance.com:9443/ws',
-  'wss://stream2.binance.com:9443/ws',
 ];
 const GECKO_IDS={BTCUSDT:'bitcoin',ETHUSDT:'ethereum',BNBUSDT:'binancecoin',SOLUSDT:'solana',XRPUSDT:'ripple',ADAUSDT:'cardano',DOGEUSDT:'dogecoin',AVAXUSDT:'avalanche-2',LINKUSDT:'chainlink',DOTUSDT:'polkadot',MATICUSDT:'matic-network',LTCUSDT:'litecoin',UNIUSDT:'uniswap',ATOMUSDT:'cosmos',FTMUSDT:'fantom',NEARUSDT:'near',ARBUSDT:'arbitrum',OPUSDT:'optimism',INJUSDT:'injective-protocol',SUIUSDT:'sui'};
-const BASE_PRICES={BTCUSDT:67000,ETHUSDT:3200,BNBUSDT:410,SOLUSDT:170,XRPUSDT:0.54,ADAUSDT:0.6,DOGEUSDT:0.16,AVAXUSDT:38,LINKUSDT:14,DOTUSDT:7,MATICUSDT:0.85,LTCUSDT:82,UNIUSDT:7.5,ATOMUSDT:9,FTMUSDT:0.65,NEARUSDT:6.5,ARBUSDT:1.1,OPUSDT:1.8,INJUSDT:22,SUIUSDT:1.2};
+// Updated prices — May 2026
+const BASE_PRICES={BTCUSDT:97000,ETHUSDT:1800,BNBUSDT:600,SOLUSDT:150,XRPUSDT:2.2,ADAUSDT:0.72,DOGEUSDT:0.18,AVAXUSDT:22,LINKUSDT:14,DOTUSDT:4.5,MATICUSDT:0.22,LTCUSDT:88,UNIUSDT:6.0,ATOMUSDT:4.5,FTMUSDT:0.65,NEARUSDT:2.8,ARBUSDT:0.38,OPUSDT:0.75,INJUSDT:12,SUIUSDT:3.5};
 
 function getIntervalMs(tf){const m={'1m':60000,'3m':180000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000,'1d':86400000};return m[tf]||300000;}
 
@@ -475,8 +478,8 @@ async function tryBinanceKlines(sym,tf,limit){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),5000);
-      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal});
+      let to=setTimeout(()=>ctrl.abort(),3000);
+      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal,mode:'cors'});
       clearTimeout(to);
       if(r.ok){
         let d=await r.json();
@@ -491,20 +494,41 @@ async function tryBinanceKlines(sym,tf,limit){
   return null;
 }
 
-// Try CoinGecko (works in India, no CORS issues)
+// Try CoinGecko OHLCV (real candle data, works in India)
 async function tryGecko(sym,n,tf){
   try{
     let gid=GECKO_IDS[sym]||'bitcoin';
+    // Map tf to CoinGecko days param
+    let days=tf==='1d'?90:tf==='4h'?30:tf==='1h'?14:tf==='15m'?3:tf==='5m'?2:1;
     let ctrl=new AbortController();
-    let to=setTimeout(()=>ctrl.abort(),6000);
-    let r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+gid+'&vs_currencies=usd&include_24hr_change=true',{signal:ctrl.signal});
+    let to=setTimeout(()=>ctrl.abort(),5000);
+    // Use OHLC endpoint for real candlestick data
+    let r=await fetch('https://api.coingecko.com/api/v3/coins/'+gid+'/ohlc?vs_currency=usd&days='+days,{signal:ctrl.signal});
     clearTimeout(to);
     if(r.ok){
       let d=await r.json();
-      let price=d[gid]&&d[gid].usd;
-      let chg=(d[gid]&&d[gid].usd_24h_change)||0;
+      if(Array.isArray(d)&&d.length>0){
+        // d = [[ts, o, h, l, c], ...]
+        let candles=d.map(function(k){return{t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:0};});
+        // backfill volume with synthetic
+        let bv={'1m':800,'3m':2000,'5m':3500,'15m':10000,'1h':40000,'4h':150000,'1d':600000}[tf]||4000;
+        candles.forEach(function(c){c.v=bv*(0.5+Math.random()*2);});
+        // take last n candles
+        if(candles.length>n)candles=candles.slice(-n);
+        let pr=candles[candles.length-1].c;
+        log('✅ CoinGecko OHLC: $'+pr.toLocaleString()+' ('+candles.length+' real candles)','var(--cyan)');
+        S.apiSource='COINGECKO';
+        return candles;
+      }
+    }
+    // Fallback: simple price → simulated candles
+    let r2=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+gid+'&vs_currencies=usd&include_24hr_change=true',{signal:new AbortController().signal});
+    if(r2.ok){
+      let d2=await r2.json();
+      let price=d2[gid]&&d2[gid].usd;
+      let chg=(d2[gid]&&d2[gid].usd_24h_change)||0;
       if(price){
-        log('✅ CoinGecko: $'+price.toLocaleString()+' ('+chg.toFixed(2)+'%) — building candles...','var(--cyan)');
+        log('✅ CoinGecko price: $'+price.toLocaleString()+' — building candles...','var(--cyan)');
         S.apiSource='COINGECKO';
         return buildCandles(price,chg,n,tf);
       }
@@ -518,8 +542,8 @@ async function tryBinanceTicker(sym){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),4000);
-      let r=await fetch(ep+'/ticker/24hr?symbol='+sym,{signal:ctrl.signal});
+      let to=setTimeout(()=>ctrl.abort(),2500);
+      let r=await fetch(ep+'/ticker/24hr?symbol='+sym,{signal:ctrl.signal,mode:'cors'});
       clearTimeout(to);
       if(r.ok)return await r.json();
     }catch(e){}
@@ -532,8 +556,8 @@ async function tryBinancePrice(sym){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),3000);
-      let r=await fetch(ep+'/ticker/price?symbol='+sym,{signal:ctrl.signal});
+      let to=setTimeout(()=>ctrl.abort(),2000);
+      let r=await fetch(ep+'/ticker/price?symbol='+sym,{signal:ctrl.signal,mode:'cors'});
       clearTimeout(to);
       if(r.ok){let d=await r.json();return parseFloat(d.price);}
     }catch(e){}
@@ -546,7 +570,7 @@ async function tryGeckoPrice(sym){
   try{
     let gid=GECKO_IDS[sym]||'bitcoin';
     let ctrl=new AbortController();
-    let to=setTimeout(()=>ctrl.abort(),5000);
+    let to=setTimeout(()=>ctrl.abort(),4000);
     let r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+gid+'&vs_currencies=usd',{signal:ctrl.signal});
     clearTimeout(to);
     if(r.ok){let d=await r.json();return d[gid]&&d[gid].usd;}
@@ -555,24 +579,32 @@ async function tryGeckoPrice(sym){
 }
 
 // Main fetch - tries everything
+// Shows simulation chart IMMEDIATELY, then upgrades to real data in background
 async function fetchKlines(sym,tf,limit){
   limit=limit||220;
 
-  // Step 1: Binance
-  setLoadMsg('Trying Binance API...');
+  // Step 0: Show chart instantly with simulation so user sees something NOW
+  let simData=buildCandles(BASE_PRICES[sym]||100,0,limit,tf);
+  S.candles=simData;S.curPrice=simData[simData.length-1].c;S.prevClose=simData[simData.length-2].c;
+  calcInds();S.dataReady=true;
+  document.getElementById('loadOv').style.display='none';
+  document.getElementById('chSym').textContent=sym;
+  renderAll();
+  S.apiSource='SIMULATION';
+
+  // Step 1: Binance (in background, upgrades chart when ready)
+  setLoadMsg('Fetching live data...');
   let result=await tryBinanceKlines(sym,tf,limit);
   if(result)return result;
 
-  // Step 2: CoinGecko
-  setLoadMsg('Binance blocked — trying CoinGecko...');
+  // Step 2: CoinGecko OHLC
+  setLoadMsg('Trying CoinGecko...');
   result=await tryGecko(sym,limit,tf);
   if(result)return result;
 
-  // Step 3: Known prices simulation
-  log('⚠ All APIs blocked! Using built-in simulation with real price estimates.','var(--red)');
-  setLoadMsg('Using simulation mode...');
-  S.apiSource='SIMULATION';
-  return buildCandles(BASE_PRICES[sym]||100,0,limit,tf);
+  // Step 3: Already rendered simulation — just return it
+  log('⚠ Live APIs unavailable — showing built-in simulation','var(--gold)');
+  return simData;
 }
 
 function setLoadMsg(msg){
