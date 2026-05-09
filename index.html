@@ -661,6 +661,15 @@ function setStatusLive(label,color){
   if(sb)sb.textContent=label;
 }
 
+function updatePriceHdr(price) {
+  let el = document.getElementById('chPr');
+  if(el) {
+    el.textContent = fmt(price);
+    el.style.color = price >= S.prevClose ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+
 // Main load function
 async function loadSymbol(){
   S.dataReady=false;
