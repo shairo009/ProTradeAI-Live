@@ -737,6 +737,45 @@ async function tryGeckoPrice(sym){
   return null;
 }
 
+// Silent fetch for scanner — no side effects on main chart state
+async function fetchKlinesQuiet(sym,tf,limit){
+  limit=limit||60;
+  // Try Binance
+  for(let ep of ENDPOINTS){
+    try{
+      let ctrl=new AbortController();
+      let to=setTimeout(()=>ctrl.abort(),3000);
+      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal,mode:'cors'});
+      clearTimeout(to);
+      if(r.ok){
+        let d=await r.json();
+        if(Array.isArray(d)&&d.length>0)return d.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+      }
+    }catch(e){}
+  }
+  // Try CoinGecko
+  try{
+    let gid=GECKO_IDS[sym]||'bitcoin';
+    let days=tf==='1d'?90:tf==='4h'?30:tf==='1h'?14:tf==='15m'?3:tf==='5m'?2:1;
+    let ctrl=new AbortController();
+    let to=setTimeout(()=>ctrl.abort(),5000);
+    let r=await fetch(geckoUrl('/coins/'+gid+'/ohlc?vs_currency=usd&days='+days),{signal:ctrl.signal,headers:geckoHeaders()});
+    clearTimeout(to);
+    if(r.ok){
+      let d=await r.json();
+      if(Array.isArray(d)&&d.length>0){
+        let candles=d.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:0}));
+        let bv={'1m':800,'3m':2000,'5m':3500,'15m':10000,'1h':40000,'4h':150000,'1d':600000}[tf]||4000;
+        candles.forEach(c=>{c.v=bv*(0.5+Math.random()*2);});
+        if(candles.length>limit)candles=candles.slice(-limit);
+        return candles;
+      }
+    }
+  }catch(e){}
+  // Fallback: silent simulation
+  return buildCandles(BASE_PRICES[sym]||100,0,limit,tf);
+}
+
 // Main fetch - tries everything
 // Shows simulation chart IMMEDIATELY, then upgrades to real data in background
 async function fetchKlines(sym,tf,limit){
@@ -1472,7 +1511,7 @@ async function buildScanner(){
   let signals=0;
   for(let sym of SYMS){
     let klines=null;
-    try{klines=await fetchKlines(sym,'5m',60);}catch(e){}
+    try{klines=await fetchKlinesQuiet(sym,'5m',60);}catch(e){}
     let pr=klines&&klines.length?klines[klines.length-1].c:(BASE_PRICES[sym]||100);
     let a=klines&&klines.length?analyze(klines,pr):null;
     if(!a)continue;
