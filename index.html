@@ -1115,7 +1115,9 @@ function fmt(n){
 }
 function getVis(){
   let c=document.getElementById('mc');
-  let W=c.width||800;
+  // Use CSS pixel width (not raw canvas width which is HiDPI-scaled)
+  let wrap=document.getElementById('cWrap');
+  let W=wrap?wrap.clientWidth:(parseInt(c.style.width)||c.offsetWidth||c.width||800);
   let cW=Math.max(3,Math.floor(7*S.zoom));
   let gap=Math.max(1,Math.floor(1.5*S.zoom));
   let tw=cW+gap,vis=Math.floor(W/tw);
@@ -1487,7 +1489,8 @@ mc3.addEventListener('mousemove',e=>{
   let r=mc3.getBoundingClientRect();S.mx=e.clientX-r.left;S.my=e.clientY-r.top;
   if(S.drag){let dx=e.clientX-S.dragX;S.dragX=e.clientX;let {tw}=getVis();S.offset=Math.max(0,Math.min(S.candles.length-30,S.offset-dx/tw));}
   let {start,end,tw,cW,gap}=getVis();
-  let idx=S.candles.length-1-Math.floor((mc3.width-S.mx)/tw);
+  let {W:cssWW}=getVis();
+  let idx=S.candles.length-1-Math.floor((cssWW-S.mx)/tw);
   if(S.candles[idx]){
     let cd=S.candles[idx];
     let tip=document.getElementById('xhTip');
