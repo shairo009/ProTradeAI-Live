@@ -88,7 +88,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:'JetBr
 .sym-sel{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:3px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:.15s}
 .sym-sel:hover{border-color:var(--blue)}
 .chart-wrap{flex:1;position:relative;min-height:0;overflow:hidden}
-#mc{display:block}
+#mc{display:block;width:100%;height:100%}
 
 /* Signal box */
 .sig-box{position:absolute;top:12px;left:12px;border-radius:10px;padding:11px 15px;pointer-events:none;min-width:165px;z-index:5;display:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
@@ -1583,13 +1583,21 @@ function p2y(p,mn,mx,H,pad=12){return pad+(H-2*pad)*(1-(p-mn)/(mx-mn));}
 function renderAll(){
   let canvas=document.getElementById('mc'),wrap=document.getElementById('cWrap');
   const dpr=window.devicePixelRatio||1;
-  const cssW=wrap.clientWidth,cssH=wrap.clientHeight;
-  if(canvas.width!==cssW*dpr||canvas.height!==cssH*dpr){
+  // Use offsetWidth/Height as fallback — clientWidth can be 0 before first paint
+  const cssW=wrap.clientWidth||wrap.offsetWidth||canvas.offsetWidth||0;
+  const cssH=wrap.clientHeight||wrap.offsetHeight||canvas.offsetHeight||0;
+  // Always resize when we have valid dimensions — fixes stuck-at-zero bug
+  if(cssW>0&&cssH>0&&(canvas.width!==cssW*dpr||canvas.height!==cssH*dpr||canvas.width===0||canvas.height===0)){
     canvas.width=cssW*dpr;canvas.height=cssH*dpr;
     canvas.style.width=cssW+'px';canvas.style.height=cssH+'px';
   }
-  let W=cssW,H=cssH;
-  if(!W||!H||S.candles.length<2)return;
+  let W=canvas.style.width?parseInt(canvas.style.width):cssW;
+  let H=canvas.style.height?parseInt(canvas.style.height):cssH;
+  if(!W||!H||S.candles.length<2){
+    // Retry after layout is computed
+    if(!W||!H)setTimeout(()=>{if(S.dataReady)renderAll();},100);
+    return;
+  }
   let {start,end,cW,gap,tw}=getVis();
   let vis=S.candles.slice(start,end);
   if(!vis.length)return;
@@ -1725,11 +1733,19 @@ function renderSubs(vis,start){
   let {cW,gap,tw}=getVis();
   const dpr=window.devicePixelRatio||1;
 
+  function sizeCanvas(c,parent){
+    const w=parent.clientWidth||parent.offsetWidth||0;
+    const h=parent.clientHeight||parent.offsetHeight||0;
+    if(w>0&&h>0&&(c.width!==w*dpr||c.height!==h*dpr||c.width===0||c.height===0)){
+      c.width=w*dpr;c.height=h*dpr;c.style.width=w+'px';c.style.height=h+'px';
+    }
+    return{w:parseInt(c.style.width)||w,h:parseInt(c.style.height)||h};
+  }
+
   // RSI
   let rc=document.getElementById('rsiC'),rp=rc.parentElement;
-  const rcW=rp.clientWidth,rcH=rp.clientHeight;
-  if(rc.width!==rcW*dpr||rc.height!==rcH*dpr){rc.width=rcW*dpr;rc.height=rcH*dpr;rc.style.width=rcW+'px';rc.style.height=rcH+'px';}
-  let rx=rc.getContext('2d'),rw=rcW,rh=rcH;
+  let {w:rw,h:rh}=sizeCanvas(rc,rp);
+  let rx=rc.getContext('2d');
   rx.setTransform(dpr,0,0,dpr,0,0);
   rx.fillStyle='#060a12';rx.fillRect(0,0,rw,rh);
   [30,50,70].forEach(lv=>{
@@ -1748,9 +1764,8 @@ function renderSubs(vis,start){
 
   // MACD
   let mc=document.getElementById('macdC'),mp=mc.parentElement;
-  const mcW=mp.clientWidth,mcH=mp.clientHeight;
-  if(mc.width!==mcW*dpr||mc.height!==mcH*dpr){mc.width=mcW*dpr;mc.height=mcH*dpr;mc.style.width=mcW+'px';mc.style.height=mcH+'px';}
-  let mx2=mc.getContext('2d'),mw=mcW,mh=mcH;
+  let {w:mw,h:mh}=sizeCanvas(mc,mp);
+  let mx2=mc.getContext('2d');
   mx2.setTransform(dpr,0,0,dpr,0,0);
   mx2.fillStyle='#060a12';mx2.fillRect(0,0,mw,mh);
   if(S.ind.macd){
@@ -1764,9 +1779,8 @@ function renderSubs(vis,start){
 
   // Volume
   let vc=document.getElementById('volC'),vp=vc.parentElement;
-  const vcW=vp.clientWidth,vcH=vp.clientHeight;
-  if(vc.width!==vcW*dpr||vc.height!==vcH*dpr){vc.width=vcW*dpr;vc.height=vcH*dpr;vc.style.width=vcW+'px';vc.style.height=vcH+'px';}
-  let vx=vc.getContext('2d'),vw=vcW,vh=vcH;
+  let {w:vw,h:vh}=sizeCanvas(vc,vp);
+  let vx=vc.getContext('2d');
   vx.setTransform(dpr,0,0,dpr,0,0);
   vx.fillStyle='#060a12';vx.fillRect(0,0,vw,vh);
   let maxV=Math.max(...vis.map(c=>c.v),1);
@@ -2053,10 +2067,18 @@ if(getGeckoKey()){
   log('🔑 CoinGecko API key loaded from storage — enhanced rate limits active','var(--cyan)');
 }
 
-loadSymbol();
+// Use requestAnimationFrame so first render happens AFTER browser layout
+// This guarantees cWrap.clientWidth/clientHeight are non-zero on first renderAll()
+requestAnimationFrame(()=>{
+  loadSymbol();
+});
 setInterval(()=>{if(S.dataReady)updateUI();},2000);
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
+
+// Safety net: force re-render 1s after load in case RAF was too early
+setTimeout(()=>{if(S.dataReady)renderAll();},1000);
+setTimeout(()=>{if(S.dataReady)renderAll();},3000);
 </script>
 </body>
 </html>
