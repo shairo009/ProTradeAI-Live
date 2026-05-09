@@ -906,7 +906,7 @@ async function buildScanner(){
     let pct=Math.min(100,Math.abs(a.score)*1.5);
     let bc=a.score>0?'var(--green)':a.score<0?'var(--red)':'var(--gold)';
     let pc=pr>=1000?pr.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}):pr<1?pr.toFixed(4):pr.toFixed(2);
-    div.innerHTML=`<div class="si-top"><span class="si-sym">${sym.replace('USDT','')}</span><span class="si-price" style="color:${a.score>0?'var(--green)':'a.score<0?var(--red)':'var(--text)'}">${pc}</span></div><div class="si-bottom"><span class="si-signal ${sc}">${sigTxt}</span><span class="si-conf">${a.conf.toFixed(0)}%</span></div><div class="si-bar"><div class="si-fill" style="width:${pct}%;background:${bc}"></div></div>`;
+    div.innerHTML=`<div class="si-top"><span class="si-sym">${sym.replace('USDT','')}</span><span class="si-price" style="color:${a.score>0?'var(--green)':a.score<0?'var(--red)':'var(--text)'}">${pc}</span></div><div class="si-bottom"><span class="si-signal ${sc}">${sigTxt}</span><span class="si-conf">${a.conf.toFixed(0)}%</span></div><div class="si-bar"><div class="si-fill" style="width:${pct}%;background:${bc}"></div></div>`;
     list.appendChild(div);
     await new Promise(r=>setTimeout(r,150));
   }
@@ -1219,7 +1219,7 @@ function genReport(){
     <div style="font-size:10px;color:var(--text2);margin-top:3px">${new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} — ${new Date().toLocaleTimeString()} IST</div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-    ${[['NET P&L',(netPnl>=0?'+':'')+'₹'+Math.abs(netPnl).toFixed(2),'$'+Math.abs(netPnl).toFixed(2),pnlC],['WIN RATE',wr+'%',wrC],['TOTAL TRADES',S.trades.length,'var(--cyan)'],['PROFIT FACTOR',pf.toFixed(2),pf>=1.5?'#00e676':pf>=1?'#ffd740':'#ff1744']].map(([l,v,c])=>`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:12px;text-align:center"><div style="font-size:9px;color:var(--text2);margin-bottom:5px;letter-spacing:.5px">${l}</div><div style="font-size:20px;font-weight:900;color:${c}">${v}</div></div>`).join('')}
+    ${[['NET P&L',(netPnl>=0?'+':'')+'₹'+Math.abs(netPnl).toFixed(2),pnlC],['WIN RATE',wr+'%',wrC],['TOTAL TRADES',S.trades.length,'var(--cyan)'],['PROFIT FACTOR',pf.toFixed(2),pf>=1.5?'#00e676':pf>=1?'#ffd740':'#ff1744']].map(([l,v,c])=>`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:12px;text-align:center"><div style="font-size:9px;color:var(--text2);margin-bottom:5px;letter-spacing:.5px">${l}</div><div style="font-size:20px;font-weight:900;color:${c}">${v}</div></div>`).join('')}
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px">
@@ -1261,7 +1261,7 @@ function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classLis
 function manualTrade(){if(!S.lastA)return;if(Math.abs(S.lastA.score)>10)execTrade(S.lastA,false);else log('⚠ Signal too weak for manual trade','var(--gold)');}
 function manClose(id){let t=S.open.find(t=>t.id===id);if(t)closeTrade(t,S.curPrice||t.entry,'Manual Close');}
 function changeSym(){let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
-function setTF(tf){S.tf=tf;S.offset=0;document.querySelectorAll('.tf').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tf').forEach(b=>{if(b.textContent===tf)b.classList.add('active');});document.getElementById('sbTF').textContent=tf;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
+function setTF(tf){S.tf=tf;S.offset=0;document.querySelectorAll('.tf').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tf').forEach(b=>{if(b.textContent.toLowerCase()===tf.toLowerCase())b.classList.add('active');});document.getElementById('sbTF').textContent=tf;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
 function switchV(v){
   document.getElementById('chartView').style.display=v==='chart'?'flex':'none';
   document.getElementById('reportView').style.display=v==='report'?'block':'none';
