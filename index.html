@@ -195,6 +195,51 @@ tr:hover td{background:rgba(61,142,255,.04)}
 ::-webkit-scrollbar-thumb{background:rgba(37,53,85,.8);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(61,142,255,.4)}
 
+/* ========== JOURNAL MODAL ========== */
+.jrnl-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:18px 12px;backdrop-filter:blur(8px)}
+.jrnl-backdrop.open{display:flex}
+.jrnl-box{background:linear-gradient(145deg,#0d1628 0%,#080e1c 100%);border:1px solid rgba(61,142,255,.25);border-radius:14px;padding:22px 24px;width:100%;max-width:1020px;box-shadow:0 28px 90px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.05);flex-shrink:0}
+.jrnl-hdr{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.jrnl-title{font-size:14px;font-weight:900;color:var(--gold);letter-spacing:2px;text-transform:uppercase;flex:1}
+.jrnl-filters{display:flex;gap:5px;flex-wrap:wrap}
+.jf{padding:3px 10px;border-radius:5px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:9px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:.15s;font-weight:700;letter-spacing:.5px}
+.jf:hover{border-color:var(--cyan);color:var(--cyan)}
+.jf.active{background:rgba(0,232,255,.15);border-color:var(--cyan);color:var(--cyan)}
+.jrnl-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px}
+.jstat{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:9px 10px;text-align:center}
+.jstat .jsl{font-size:8px;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:3px}
+.jstat .jsv{font-size:15px;font-weight:900;letter-spacing:.3px}
+.jrnl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
+.jcard{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;transition:.2s;border-left:3px solid var(--border2)}
+.jcard.win{border-left-color:var(--green)}
+.jcard.loss{border-left-color:var(--red)}
+.jcard-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.jcard-sym{font-size:12px;font-weight:900;color:#fff;letter-spacing:.5px}
+.jcard-grade{font-size:9px;font-weight:900;padding:2px 7px;border-radius:4px;letter-spacing:.5px}
+.grade-Ap{background:rgba(255,215,0,.18);color:#ffd700;border:1px solid rgba(255,215,0,.4)}
+.grade-A{background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3)}
+.grade-B{background:rgba(0,232,255,.12);color:var(--cyan);border:1px solid rgba(0,232,255,.3)}
+.grade-C{background:rgba(255,152,0,.12);color:var(--gold);border:1px solid rgba(255,152,0,.3)}
+.grade-D{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border2)}
+.jcard-dir{font-size:10px;font-weight:900;padding:2px 8px;border-radius:4px}
+.jcard-status{font-size:10px;font-weight:900}
+.jcard-pnl{font-size:16px;font-weight:900;margin:6px 0 8px}
+.jcard-meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:9px;color:var(--text2);margin-bottom:8px;line-height:1.7}
+.jcard-meta span{color:var(--text)}
+.jcard-checks{border-top:1px solid rgba(255,255,255,.05);padding-top:8px;margin-top:4px}
+.jchk-title{font-size:8px;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px}
+.jchk-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.jchk{font-size:8.5px;display:flex;align-items:center;gap:4px;padding:2px 0}
+.jchk .ji{font-size:10px}
+.jcard-reasons{margin-top:7px;font-size:8.5px;color:var(--text2);line-height:1.7;border-top:1px solid rgba(255,255,255,.04);padding-top:6px}
+.jrnl-empty{text-align:center;padding:50px 20px;color:var(--text2);font-size:12px;letter-spacing:1px}
+.jrnl-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.jbtn{padding:6px 16px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer;font-weight:700;transition:.15s}
+.jbtn:hover{border-color:var(--cyan);color:var(--cyan)}
+.jbtn.export{background:rgba(0,232,255,.1);border-color:rgba(0,232,255,.35);color:var(--cyan)}
+.hbtn.jrnl{background:rgba(255,200,50,.1);border-color:rgba(255,200,50,.35);color:var(--gold)}
+.hbtn.jrnl:hover{background:rgba(255,200,50,.2)}
+
 /* ========== SETTINGS MODAL ========== */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
 .modal-backdrop.open{display:flex}
@@ -240,6 +285,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <div class="hdr-btns">
     <button class="hbtn act" onclick="switchV('chart')" id="btnC">📈 Chart</button>
     <button class="hbtn" onclick="switchV('report')" id="btnR">📊 Report</button>
+    <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
     <span class="api-badge no-key" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
     <button class="hbtn danger" onclick="resetAcc()">↺ Reset</button>
@@ -264,6 +310,30 @@ tr:hover td{background:rgba(61,142,255,.04)}
       <button class="mbtn mbtn-save" onclick="saveGeckoKey()">✅ SAVE &amp; APPLY</button>
       <button class="mbtn mbtn-clear" onclick="clearGeckoKey()">🗑 CLEAR</button>
       <button class="mbtn mbtn-close" onclick="closeSettings()">✕ CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRADE JOURNAL MODAL -->
+<div class="jrnl-backdrop" id="journalModal" onclick="if(event.target===this)closeJournal()">
+  <div class="jrnl-box">
+    <div class="jrnl-hdr">
+      <div class="jrnl-title">📓 TRADE JOURNAL</div>
+      <div class="jrnl-filters" id="jFilters">
+        <button class="jf active" onclick="setJFilter('all',this)">ALL</button>
+        <button class="jf" onclick="setJFilter('win',this)">✅ WIN</button>
+        <button class="jf" onclick="setJFilter('loss',this)">❌ LOSS</button>
+        <button class="jf" onclick="setJFilter('buy',this)">▲ BUY</button>
+        <button class="jf" onclick="setJFilter('sell',this)">▼ SELL</button>
+        <button class="jf" onclick="setJFilter('gradeA',this)">⭐ A/A+</button>
+        <button class="jf" onclick="setJFilter('src',this)">🤖 AI AUTO</button>
+      </div>
+    </div>
+    <div class="jrnl-stats" id="jStats"></div>
+    <div class="jrnl-grid" id="jGrid"></div>
+    <div class="jrnl-footer">
+      <button class="jbtn export" onclick="exportJournalCSV()">⬇ Export CSV</button>
+      <button class="jbtn" onclick="closeJournal()">✕ Close</button>
     </div>
   </div>
 </div>
@@ -586,6 +656,132 @@ function clearGeckoKey(){
   st.className='modal-status ok';
   st.textContent='🗑 Key cleared. Using CoinGecko public API (rate limited).';
   updateApiBadge();
+}
+
+// ==================== TRADE JOURNAL ====================
+var jFilter='all';
+
+function openJournal(){
+  document.getElementById('journalModal').classList.add('open');
+  renderJournal();
+}
+function closeJournal(){
+  document.getElementById('journalModal').classList.remove('open');
+}
+function setJFilter(f,btn){
+  jFilter=f;
+  document.querySelectorAll('.jf').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderJournal();
+}
+
+function getJournalGradeClass(g){
+  if(!g)return 'grade-D';
+  return 'grade-'+(g==='A+'?'Ap':g);
+}
+
+function renderJournal(){
+  let trades=S.trades.slice();
+  if(jFilter==='win')trades=trades.filter(t=>t.status==='WIN');
+  else if(jFilter==='loss')trades=trades.filter(t=>t.status==='LOSS');
+  else if(jFilter==='buy')trades=trades.filter(t=>t.dir==='BUY');
+  else if(jFilter==='sell')trades=trades.filter(t=>t.dir==='SELL');
+  else if(jFilter==='gradeA')trades=trades.filter(t=>t.grade==='A+'||t.grade==='A');
+  else if(jFilter==='src')trades=trades.filter(t=>t.src==='AI AUTO');
+  trades=trades.slice().reverse();
+
+  // Stats bar
+  let wins=trades.filter(t=>t.status==='WIN'),losses=trades.filter(t=>t.status==='LOSS');
+  let netPnl=trades.reduce((a,t)=>a+t.pnl,0);
+  let wr=trades.length?Math.round(wins.length/trades.length*100):0;
+  let winPnl=wins.reduce((a,t)=>a+t.pnl,0);
+  let lossPnl=losses.reduce((a,t)=>a+Math.abs(t.pnl),0);
+  let pf=lossPnl?+(winPnl/lossPnl).toFixed(2):(wins.length?99:0);
+  let avgConf=trades.length?Math.round(trades.reduce((a,t)=>a+(t.conf||0),0)/trades.length):0;
+  let gradeACount=trades.filter(t=>t.grade==='A+'||t.grade==='A').length;
+
+  let pnlC=netPnl>=0?'var(--green)':'var(--red)';
+  let wrC=wr>=60?'var(--green)':wr>=40?'var(--gold)':'var(--red)';
+  document.getElementById('jStats').innerHTML=`
+    <div class="jstat"><div class="jsl">Trades</div><div class="jsv" style="color:var(--cyan)">${trades.length}</div></div>
+    <div class="jstat"><div class="jsl">Net P&L</div><div class="jsv" style="color:${pnlC}">${netPnl>=0?'+':''}₹${netPnl.toFixed(0)}</div></div>
+    <div class="jstat"><div class="jsl">Win Rate</div><div class="jsv" style="color:${wrC}">${wr}%</div></div>
+    <div class="jstat"><div class="jsl">Profit Factor</div><div class="jsv" style="color:${pf>=1.5?'var(--green)':pf>=1?'var(--gold)':'var(--red)'}">${pf===99?'∞':pf.toFixed(2)}</div></div>
+    <div class="jstat"><div class="jsl">Grade A Setups</div><div class="jsv" style="color:var(--gold)">${gradeACount}</div></div>`;
+
+  const grid=document.getElementById('jGrid');
+  if(!trades.length){
+    grid.innerHTML='<div class="jrnl-empty" style="grid-column:1/-1">📓 No trades to journal yet.<br><span style="font-size:10px;margin-top:8px;display:block">Trades appear here automatically when closed by the AI or manually.</span></div>';
+    return;
+  }
+
+  const CHK_LABELS={rsi:'RSI',macd:'MACD',ma:'MA Trend',stoch:'Stoch',bb:'Bollinger',st:'Supertrend',pattern:'Pattern'};
+  grid.innerHTML=trades.map(t=>{
+    let isWin=t.status==='WIN';
+    let grade=t.grade||'D';
+    let gClass=getJournalGradeClass(grade);
+    let pnlStr=(t.pnl>=0?'+':'')+'₹'+t.pnl.toFixed(2);
+    let pnlC2=isWin?'var(--green)':'var(--red)';
+    let dirC=t.dir==='BUY'?'rgba(0,230,118,.15)':'rgba(255,23,68,.15)';
+    let dirBorder=t.dir==='BUY'?'rgba(0,230,118,.4)':'rgba(255,23,68,.4)';
+    let dirCol=t.dir==='BUY'?'var(--green)':'var(--red)';
+    // indicator checks
+    let checksHTML='';
+    if(t.checks){
+      checksHTML='<div class="jcard-checks"><div class="jchk-title">7-Check Confluence</div><div class="jchk-grid">';
+      let isBuyTrade=t.dir==='BUY';
+      Object.entries(CHK_LABELS).forEach(([k,lbl])=>{
+        let chk=t.checks[k];
+        if(!chk){checksHTML+=`<div class="jchk"><span class="ji" style="color:var(--text3)">◌</span><span style="color:var(--text3)">${lbl}: N/A</span></div>`;return;}
+        let aligned=(isBuyTrade&&chk.v===1)||(!isBuyTrade&&chk.v===-1);
+        let neutral=chk.v===0;
+        let ic=neutral?'◎':aligned?'✓':'✗';
+        let col=neutral?'var(--text2)':aligned?'var(--green)':'var(--red)';
+        checksHTML+=`<div class="jchk"><span class="ji" style="color:${col}">${ic}</span><span style="color:${neutral?'var(--text2)':col}">${chk.lbl||lbl}</span></div>`;
+      });
+      checksHTML+='</div></div>';
+    }
+    // reasons
+    let allR=(t.allReasons&&t.allReasons.length)?t.allReasons:(t.reasons?[t.reasons]:[]);
+    let reasonsHTML=allR.length?`<div class="jcard-reasons">💬 ${allR.slice(0,4).join(' · ')}</div>`:'';
+    let dur=t.closeTime?`${t.openTime} → ${t.closeTime}`:(t.openTime||'');
+    return`<div class="jcard ${isWin?'win':'loss'}">
+      <div class="jcard-top">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div class="jcard-sym">${t.sym.replace('USDT','')} <span style="font-size:9px;color:var(--text2);font-weight:400">#${t.id}</span></div>
+          <div class="jcard-dir" style="background:${dirC};border:1px solid ${dirBorder};color:${dirCol}">${t.dir}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="jcard-grade ${gClass}">${grade}</div>
+          <div class="jcard-status" style="color:${pnlC2}">${isWin?'✅ WIN':'❌ LOSS'}</div>
+        </div>
+      </div>
+      <div class="jcard-pnl" style="color:${pnlC2}">${pnlStr} <span style="font-size:10px;color:var(--text2);font-weight:400">| Conf: ${(t.conf||0).toFixed(0)}% | Score: ${t.score>0?'+':''}${t.score}</span></div>
+      <div class="jcard-meta">
+        <div>Entry <span>${fmt(t.entry)}</span></div>
+        <div>Exit <span>${fmt(t.exit||0)}</span></div>
+        <div>SL <span style="color:var(--red)">${fmt(t.sl)}</span></div>
+        <div>TP Hit <span style="color:var(--green)">TP${t.tpHit||'-'}</span></div>
+        <div>TF <span>${t.tf||'5m'}</span></div>
+        <div>Source <span style="color:${t.src==='AI AUTO'?'var(--cyan)':'var(--gold)'}">${t.src}</span></div>
+        <div style="grid-column:1/-1">Time <span style="color:var(--text2);font-size:8px">${dur}</span></div>
+      </div>
+      ${checksHTML}
+      ${reasonsHTML}
+    </div>`;
+  }).join('');
+}
+
+function exportJournalCSV(){
+  if(!S.trades.length){alert('No trades to export yet.');return;}
+  let hdr=['#','Symbol','Direction','Entry','Exit','SL','TP Hit','Grade','Score','Conf%','Win/Loss','P&L (INR)','Source','TF','Open Time','Close Time','Reasons'];
+  let rows=S.trades.map(t=>[t.id,t.sym,t.dir,t.entry,t.exit||'',t.sl,t.tpHit||0,t.grade||'D',t.score,Math.round(t.conf||0),t.status,t.pnl.toFixed(2),t.src,t.tf||'5m',t.openTime||'',t.closeTime||'',(t.allReasons||[t.reasons]).join('; ')].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
+  let csv=[hdr.join(','),...rows].join('\n');
+  let blob=new Blob([csv],{type:'text/csv'});
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ProTradeAI_Journal_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
 }
 
 // ==================== API ENGINE (CORS-SAFE) ====================
@@ -1552,7 +1748,7 @@ function execTrade(a,auto){
   // NO LEVERAGE - spot only. size = units of crypto = risk amount / SL distance
   let size=parseFloat((riskAmt/slDist).toFixed(6));
 
-  let t={id:S.tid++,sym:S.sym,dir:a.isBuy?'BUY':'SELL',entry:a.entry,sl:a.sl,tp1:a.tp1,tp2:a.tp2,tp3:a.tp3,tp4:a.tp4,size,riskAmt:parseFloat(riskAmt.toFixed(2)),openTime:new Date().toLocaleTimeString(),score:a.score,conf:a.conf,reasons:a.reasons.slice(0,2).join(', '),status:'OPEN',pnl:0,tpHit:0,ticksOpen:0,src:auto?'AI AUTO':'MANUAL'};
+  let t={id:S.tid++,sym:S.sym,dir:a.isBuy?'BUY':'SELL',entry:a.entry,sl:a.sl,tp1:a.tp1,tp2:a.tp2,tp3:a.tp3,tp4:a.tp4,size,riskAmt:parseFloat(riskAmt.toFixed(2)),openTime:new Date().toLocaleTimeString(),openTs:Date.now(),score:a.score,conf:a.conf,grade:a.grade,checks:a.checks,reasons:a.reasons.slice(0,2).join(', '),allReasons:a.reasons.slice(),bullCount:a.bullCount,bearCount:a.bearCount,volRatio:a.volRatio,status:'OPEN',pnl:0,tpHit:0,ticksOpen:0,src:auto?'AI AUTO':'MANUAL',tf:S.tf};
   S.open.push(t);
   S.lastTradeT=now;
   log(`📥 ${auto?'AI':'Manual'} ${t.dir} ${t.sym} @ ${fmt(t.entry)} | Risk:₹${t.riskAmt.toFixed(0)} | Conf:${a.conf.toFixed(0)}%`,t.dir==='BUY'?'var(--green)':'var(--red)');
