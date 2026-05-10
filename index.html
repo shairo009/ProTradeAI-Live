@@ -988,8 +988,10 @@ async function fetchKlines(sym,tf,limit){
   // Step 0: Show chart instantly with simulation so user sees something NOW
   let simData=buildCandles(BASE_PRICES[sym]||100,0,limit,tf);
   S.candles=simData;S.curPrice=simData[simData.length-1].c;S.prevClose=simData[simData.length-2].c;
-  calcInds();S.dataReady=true;
+  // Hide overlay FIRST so user always sees chart even if calcInds throws
   document.getElementById('loadOv').style.display='none';
+  try{calcInds();}catch(e){console.warn('calcInds err',e);}
+  S.dataReady=true;
   document.getElementById('chSym').textContent=sym;
   renderAll();
   S.apiSource='SIMULATION';
@@ -1154,7 +1156,9 @@ async function loadSymbol(){
   document.getElementById('statusPill').className='status-pill sp-load';
   document.getElementById('statusPill').textContent='⟳ LOADING...';
 
-  let klines=await fetchKlines(S.sym,S.tf,220);
+  let klines;
+  try{klines=await fetchKlines(S.sym,S.tf,220);}
+  catch(e){console.warn('fetchKlines err',e);klines=buildCandles(BASE_PRICES[S.sym]||97000,0,220,S.tf);}
   if(!klines||!klines.length){
     document.getElementById('loadSub').textContent='❌ Failed. Check internet.';
     document.getElementById('statusPill').className='status-pill sp-err';
@@ -2320,6 +2324,11 @@ if(getGeckoKey()){
 requestAnimationFrame(()=>{
   loadSymbol();
 });
+// Safety net: force-hide overlay after 3s no matter what
+setTimeout(function(){
+  var ov=document.getElementById('loadOv');
+  if(ov&&ov.style.display!=='none'){ov.style.display='none';if(!S.dataReady){S.candles=buildCandles(BASE_PRICES[S.sym]||97000,0,220,S.tf);try{calcInds();}catch(e){}S.dataReady=true;renderAll();}}
+},3000);
 setInterval(()=>{if(S.dataReady)updateUI();},2000);
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
