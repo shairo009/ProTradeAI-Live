@@ -54,7 +54,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:'JetBr
 .main{display:flex;flex:1;overflow:hidden}
 
 /* ========== LEFT SCANNER ========== */
-.scanner{width:210px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.scanner{width:210px;min-width:190px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
 .panel-title{padding:7px 12px;border-bottom:1px solid var(--border);font-size:10px;color:var(--gold);font-weight:900;letter-spacing:1.5px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;text-transform:uppercase;background:linear-gradient(180deg,rgba(255,200,50,.04) 0%,transparent 100%)}
 .panel-title .badge{background:linear-gradient(135deg,var(--green),#00b857);color:#000;border-radius:10px;padding:1px 8px;font-size:9px;font-weight:900;box-shadow:0 0 8px rgba(0,240,122,.3)}
 .scan-list{flex:1;overflow-y:auto}
@@ -1887,11 +1887,12 @@ async function runScan(){
 }
 
 // ==================== TRADE ENGINE ====================
-function execTrade(a,auto){
+function execTrade(a,auto,symOverride){
   let now=Date.now();
+  let tradeSym=symOverride||S.sym;
   if(now-S.lastTradeT<10000&&auto)return;
   if(S.open.length>=3){if(auto)return;log('⚠ Max 3 open trades','var(--gold)');return;}
-  if(S.open.find(t=>t.sym===S.sym)){if(auto)return;log('⚠ Already open: '+S.sym,'var(--gold)');return;}
+  if(S.open.find(t=>t.sym===tradeSym)){if(auto)return;log('⚠ Already open: '+tradeSym,'var(--gold)');return;}
   if(S.bal<500){log('❌ Low balance','var(--red)');return;}
 
   let risk=parseInt(document.getElementById('riskR').value)/100;
@@ -1900,10 +1901,11 @@ function execTrade(a,auto){
   // NO LEVERAGE - spot only. size = units of crypto = risk amount / SL distance
   let size=parseFloat((riskAmt/slDist).toFixed(6));
 
-  let t={id:S.tid++,sym:S.sym,dir:a.isBuy?'BUY':'SELL',entry:a.entry,sl:a.sl,tp1:a.tp1,tp2:a.tp2,tp3:a.tp3,tp4:a.tp4,size,riskAmt:parseFloat(riskAmt.toFixed(2)),openTime:new Date().toLocaleTimeString(),openTs:Date.now(),score:a.score,conf:a.conf,grade:a.grade,checks:a.checks,reasons:a.reasons.slice(0,2).join(', '),allReasons:a.reasons.slice(),bullCount:a.bullCount,bearCount:a.bearCount,volRatio:a.volRatio,status:'OPEN',pnl:0,tpHit:0,ticksOpen:0,src:auto?'AI AUTO':'MANUAL',tf:S.tf};
+  let t={id:S.tid++,sym:tradeSym,dir:a.isBuy?'BUY':'SELL',entry:a.entry,sl:a.sl,tp1:a.tp1,tp2:a.tp2,tp3:a.tp3,tp4:a.tp4,size,riskAmt:parseFloat(riskAmt.toFixed(2)),openTime:new Date().toLocaleTimeString(),openTs:Date.now(),score:a.score,conf:a.conf,grade:a.grade,checks:a.checks,reasons:a.reasons.slice(0,2).join(', '),allReasons:a.reasons.slice(),bullCount:a.bullCount,bearCount:a.bearCount,volRatio:a.volRatio,status:'OPEN',pnl:0,tpHit:0,ticksOpen:0,src:auto?'AI AUTO':'MANUAL',tf:S.tf};
   S.open.push(t);
   S.lastTradeT=now;
-  log(`📥 ${auto?'AI':'Manual'} ${t.dir} ${t.sym} @ ${fmt(t.entry)} | Risk:₹${t.riskAmt.toFixed(0)} | Conf:${a.conf.toFixed(0)}%`,t.dir==='BUY'?'var(--green)':'var(--red)');
+  log(`📥 ${auto?'AI':'Manual'} ${t.dir} ${t.sym}${symOverride&&symOverride!==S.sym?' [SCAN:'+ symOverride+']':''} @ ${fmt(t.entry)} | Risk:₹${t.riskAmt.toFixed(0)} | Conf:${a.conf.toFixed(0)}%`,t.dir==='BUY'?'var(--green)':'var(--red)');
+  saveState();
 }
 
 function closeTrade(t,closeP,reason){
@@ -1917,6 +1919,7 @@ function closeTrade(t,closeP,reason){
   S.trades.push({...t});
   S.open=S.open.filter(x=>x.id!==t.id);
   log(`${pnl>=0?'✅':'❌'} CLOSED ${t.sym} ${t.dir} | ${pnl>=0?'+':''}$${pnl.toFixed(2)} | ${reason}`,pnl>=0?'var(--green)':'var(--red)');
+  saveState();
 }
 
 function monitorTrades(){
@@ -2332,7 +2335,7 @@ function switchV(v){
   if(v==='setups')document.getElementById('setupsContent').innerHTML=genBestSetupsHtml();
   if(v==='botcheck'){botRender();}
 }
-function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
+function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;S.equityHistory=[];localStorage.removeItem('protradeai_v4_state');log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
 function log(msg,col){
   let l=document.getElementById('aiLog'),d=document.createElement('div');
   d.className='li';d.innerHTML=`<span class="lt">[${new Date().toLocaleTimeString()}] </span><span style="color:${col||'var(--text)'}">${msg}</span>`;
@@ -2459,6 +2462,9 @@ if(getGeckoKey()){
   log('🔑 CoinGecko API key loaded from storage — enhanced rate limits active','var(--cyan)');
 }
 
+// ── LOAD SAVED STATE BEFORE ANYTHING ──
+loadState();
+
 // Use requestAnimationFrame so first render happens AFTER browser layout
 // This guarantees cWrap.clientWidth/clientHeight are non-zero on first renderAll()
 requestAnimationFrame(()=>{
@@ -2473,9 +2479,123 @@ setInterval(()=>{if(S.dataReady)updateUI();},2000);
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
 
+// ── MULTI-COIN AUTO MONITOR: every 90s scan all 20 coins ──
+setTimeout(runMultiCoinMonitor, 15000); // first scan after 15s
+setInterval(runMultiCoinMonitor, 90000); // then every 90s
+
 // Safety net: force re-render 1s after load in case RAF was too early
 setTimeout(()=>{if(S.dataReady)renderAll();},1000);
 setTimeout(()=>{if(S.dataReady)renderAll();},3000);
+
+// ==================== LOCALSTORAGE PERSISTENCE ====================
+const _STATE_KEY='protradeai_v4_state';
+
+function saveState(){
+  try{
+    localStorage.setItem(_STATE_KEY,JSON.stringify({
+      bal:S.bal,
+      trades:S.trades,
+      open:S.open,
+      equityHistory:S.equityHistory.slice(-200),
+      tid:S.tid,
+      ts:Date.now()
+    }));
+  }catch(e){}
+}
+
+function loadState(){
+  try{
+    let raw=localStorage.getItem(_STATE_KEY);
+    if(!raw)return;
+    let d=JSON.parse(raw);
+    if(typeof d.bal==='number'&&d.bal>=0)S.bal=d.bal;
+    if(Array.isArray(d.trades))S.trades=d.trades;
+    if(Array.isArray(d.open))S.open=d.open;
+    if(Array.isArray(d.equityHistory))S.equityHistory=d.equityHistory;
+    if(typeof d.tid==='number')S.tid=d.tid;
+    log('💾 Saved data restored — Balance: ₹'+S.bal.toLocaleString('en-IN',{minimumFractionDigits:2})+' | Trades: '+S.trades.length,'var(--cyan)');
+  }catch(e){
+    log('⚠ Could not load saved state: '+e.message,'var(--gold)');
+  }
+}
+
+// ==================== MULTI-COIN AI MONITOR ====================
+var _mcMonRunning=false;
+var SCAN_SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','FTMUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
+
+async function runMultiCoinMonitor(){
+  if(_mcMonRunning){log('⏳ Multi-scan already running...','var(--gold)');return;}
+  if(!S.auto){return;} // only when auto-trade is ON
+  if(S.open.length>=3){log('📊 Multi-scan skipped — max trades open','var(--gold)');return;}
+  _mcMonRunning=true;
+  log('🔭 Multi-coin scan started — checking all 20 coins...','var(--cyan)');
+
+  let best=null;
+  let bestAbs=0;
+
+  for(let i=0;i<SCAN_SYMS.length;i++){
+    let sym=SCAN_SYMS[i];
+    // Skip if already have open trade on this coin
+    if(S.open.find(t=>t.sym===sym))continue;
+    if(S.open.length>=3)break;
+
+    try{
+      // Fetch klines quietly
+      let url='https://api.binance.com/api/v3/klines?symbol='+sym+'&interval='+S.tf+'&limit=100';
+      let ctrl=new AbortController();
+      let to=setTimeout(()=>ctrl.abort(),8000);
+      let r=await fetch(url,{signal:ctrl.signal});
+      clearTimeout(to);
+      if(!r.ok)continue;
+      let raw=await r.json();
+      if(!Array.isArray(raw)||raw.length<40)continue;
+
+      let klines=raw.map(k=>({t:k[0],o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])}));
+      let pr=klines[klines.length-1].c;
+
+      // Run analyze with temp candles
+      let savedCandles=S.candles;
+      let savedSym=S.sym;
+      let savedPrice=S.curPrice;
+      S.candles=klines;
+      S.curPrice=pr;
+      let a=analyze(klines,pr);
+      S.candles=savedCandles;
+      S.sym=savedSym;
+      S.curPrice=savedPrice;
+
+      if(!a)continue;
+      let absScore=Math.abs(a.score);
+
+      // Must be strong signal (score ≥26)
+      if(absScore>=26&&(a.isBuy||a.isSell)){
+        if(absScore>bestAbs){
+          bestAbs=absScore;
+          best={a,sym,pr};
+          log('🎯 Strong signal: '+(a.isBuy?'BUY':'SELL')+' '+sym+' score:'+a.score.toFixed(0)+' conf:'+a.conf.toFixed(0)+'%',a.isBuy?'var(--green)':'var(--red)');
+        }
+      }
+    }catch(e){}
+
+    // Small delay to avoid rate limiting
+    await new Promise(res=>setTimeout(res,400));
+  }
+
+  if(best&&S.auto&&S.open.length<3&&!S.open.find(t=>t.sym===best.sym)){
+    log('🤖 AUTO TRADING: '+(best.a.isBuy?'BUY':'SELL')+' '+best.sym+' | Score:'+best.a.score.toFixed(0)+' | Conf:'+best.a.conf.toFixed(0)+'%',best.a.isBuy?'var(--green)':'var(--red)');
+    execTrade(best.a,true,best.sym);
+    playAlert(best.a.isBuy?'buy':'sell');
+    // Switch chart to the traded coin
+    document.getElementById('symSel').value=best.sym;
+    S.sym=best.sym;S.offset=0;
+    if(S.ws){try{S.ws.close();}catch(e){}}
+    loadSymbol();
+  }else if(!best){
+    log('🔭 Multi-scan done — no strong signal found across all 20 coins','var(--gold)');
+  }
+
+  _mcMonRunning=false;
+}
 
 // ==================== BEST SETUP DETECTOR ====================
 function getBestSetups(){
