@@ -398,6 +398,9 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <div class="modal-sub">Configure API keys for live data & AI Intelligence Bot</div>
     <label class="modal-label">CoinGecko API Key (Free — 30 calls/min)</label>
     <input class="modal-input" id="geckoKeyInput" type="password" placeholder="CG-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <label class="modal-label" style="margin-top:10px">🟢 NVIDIA NIM API Key (AI Chat — GLM-4 model, recommended)</label>
+    <input class="modal-input" id="nvidiaKeyInput" type="password" placeholder="nvapi-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get free key at <a href="https://build.nvidia.com" target="_blank" style="color:var(--cyan)">build.nvidia.com</a> — GLM-4 9B model, very fast &amp; free</div>
     <label class="modal-label" style="margin-top:10px">🤖 OpenAI API Key (for AI Chat — GPT-4o-mini)</label>
     <input class="modal-input" id="openaiKeyInput" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
     <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--cyan)">platform.openai.com/api-keys</a> — stores only in your browser, never shared</div>
@@ -758,6 +761,7 @@ function openSettings(){
   const inp=document.getElementById('geckoKeyInput');
   const st=document.getElementById('modalStatus');
   inp.value=getGeckoKey();
+  var nvk=document.getElementById('nvidiaKeyInput');if(nvk)nvk.value=localStorage.getItem('ptai_nvidia_key')||'';
   var oaik=document.getElementById('openaiKeyInput');if(oaik)oaik.value=localStorage.getItem('ptai_openai_key')||'';
   var nki=document.getElementById('opencodezenKeyInput');if(nki)nki.value=localStorage.getItem('ptai_opencodezen_key')||'';
   st.className='modal-status';
@@ -779,7 +783,10 @@ async function saveGeckoKey(){
   const oaikEl=document.getElementById('openaiKeyInput');
   const openaiKey=oaikEl?oaikEl.value.trim():'';
 
-  // Save OpenAI key and OpenCode Zen key immediately
+  const nvkEl=document.getElementById('nvidiaKeyInput');
+  const nvidiaKey=nvkEl?nvkEl.value.trim():'';
+  // Save all keys immediately
+  if(nvidiaKey){ localStorage.setItem('ptai_nvidia_key',nvidiaKey); }
   if(openaiKey){ localStorage.setItem('ptai_openai_key',openaiKey); }
   if(zenKey){ localStorage.setItem('ptai_opencodezen_key',zenKey); }
 
@@ -3925,6 +3932,7 @@ function removeTyping(){var el=document.getElementById('chatTypingIndicator');if
 
 function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
 function getOpenAIKey(){ return localStorage.getItem('ptai_openai_key')||''; }
+function getNvidiaKey(){ return localStorage.getItem('ptai_nvidia_key')||''; }
 
 function setChatStatus(label,color){
   var el=document.getElementById('chatStatus');
@@ -3954,16 +3962,21 @@ async function sendChat(){
     var sysPrompt=buildSystemPrompt(liveData);
     var messages=[{role:'system',content:sysPrompt}].concat(_chatHistory.slice(-12));
     var endpoints=[];
-    // 1st priority: OpenAI key if user set it
+    // 1st priority: NVIDIA NIM — GLM-4 9B (fast, free)
+    var nvidiaKey=getNvidiaKey();
+    if(nvidiaKey){
+      endpoints.push({url:'https://integrate.api.nvidia.com/v1/chat/completions',headers:{'Authorization':'Bearer '+nvidiaKey,'Content-Type':'application/json'},body:{model:'zhipu-ai/glm-4-9b-chat',messages:messages,max_tokens:800,temperature:0.5}});
+    }
+    // 2nd: OpenAI key if set
     var openaiKey=getOpenAIKey();
     if(openaiKey){
       endpoints.push({url:'https://api.openai.com/v1/chat/completions',headers:{'Authorization':'Bearer '+openaiKey,'Content-Type':'application/json'},body:{model:'gpt-4o-mini',messages:messages,max_tokens:800,temperature:0.5}});
     }
-    // 2nd: OpenCode Zen key
+    // 3rd: OpenCode Zen key
     if(key){
       endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
-    // Free fallbacks — try in order
+    // Free fallbacks
     endpoints.push({url:'https://api.pollinations.ai/v1/chat/completions',headers:{'Content-Type':'application/json'},body:{model:'openai',messages:messages,max_tokens:800,temperature:0.5}});
     endpoints.push({url:'https://text.pollinations.ai/openai',headers:{'Content-Type':'application/json'},body:{model:'openai-large',messages:messages,max_tokens:800,temperature:0.5}});
 
