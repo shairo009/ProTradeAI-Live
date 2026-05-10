@@ -269,6 +269,46 @@ tr:hover td{background:rgba(61,142,255,.04)}
 .api-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:900;letter-spacing:.3px;cursor:pointer;transition:.2s}
 .api-badge.has-key{background:rgba(0,240,122,.12);color:var(--green);border:1px solid rgba(0,240,122,.3)}
 .api-badge.no-key{background:rgba(255,200,50,.1);color:var(--gold);border:1px solid rgba(255,200,50,.25)}
+
+/* ========== RESPONSIVE HEADER ========== */
+@media (max-width:1400px){
+  .hdr{gap:5px;padding:5px 10px}
+  .logo{font-size:14px;letter-spacing:2px}
+  .chip{padding:3px 8px}
+  .chip .cv{font-size:11px}
+  .hbtn{padding:3px 9px;font-size:9px}
+  .status-pill{padding:3px 9px;font-size:9px}
+}
+@media (max-width:1200px){
+  .hdr{gap:4px;padding:4px 8px}
+  .logo{font-size:13px;letter-spacing:1px}
+  .chip{padding:2px 7px}
+  .chip .cl{font-size:7px}
+  .chip .cv{font-size:10px}
+  .hbtn{padding:2px 7px;font-size:9px}
+  .status-pill{font-size:8px;padding:3px 8px}
+  #tickerRow{display:none}
+}
+@media (max-width:1050px){
+  .hdr{gap:3px;padding:3px 6px}
+  .logo{font-size:12px;letter-spacing:0}
+  #fgChipWrap{display:none!important}
+  .chip{padding:2px 6px}
+  .chip .cl{display:none}
+  .chip .cv{font-size:10px}
+  .hbtn{padding:2px 6px;font-size:8.5px}
+  .status-pill{font-size:8px;padding:2px 7px;letter-spacing:0}
+  .scanner{width:175px;min-width:155px}
+  .right{width:220px}
+}
+@media (max-width:900px){
+  #fgChipWrap{display:none!important}
+  .balance-row .chip:nth-child(n+3){display:none}
+  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ){display:none}
+  .api-badge{display:none}
+  .scanner{width:155px;min-width:140px}
+  .right{width:200px}
+}
 </style>
 </head>
 <body>
@@ -304,7 +344,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 
 <!-- AI CHAT MODAL -->
-<div id="aiChatModal" style="display:none;position:fixed;right:0;top:52px;bottom:0;width:420px;z-index:8000;background:rgba(6,10,18,.98);backdrop-filter:blur(12px);border-left:1px solid rgba(61,142,255,.3);flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.6)">
+<div id="aiChatModal" style="display:none;position:fixed;right:0;top:52px;bottom:0;width:min(420px,100vw);z-index:8000;background:rgba(6,10,18,.98);backdrop-filter:blur(12px);border-left:1px solid rgba(61,142,255,.3);flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.6)">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(61,142,255,.25);background:rgba(4,8,16,.9);flex-shrink:0">
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-size:11px;font-weight:900;color:var(--cyan);letter-spacing:1px">🤖 MiniMax M2.5</span>
@@ -557,7 +597,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
         <span id="intelStatus" style="font-size:8px;padding:2px 7px;border-radius:10px;background:rgba(255,200,50,.1);color:var(--gold);border:1px solid rgba(255,200,50,.3)">OFFLINE</span>
       </h4>
       <div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:6px">Real-time news · Whale alerts · Reddit · AI sentiment via OpenCode Zen MiniMax</div>
-      <div id="intelSentBar" style="display:flex;gap:4px;margin-bottom:6px;display:none">
+      <div id="intelSentBar" style="display:none;gap:4px;margin-bottom:6px">
         <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBullPct" style="background:rgba(0,240,122,.1);color:var(--green)">--% BULL</div>
         <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBearPct" style="background:rgba(255,45,85,.1);color:var(--red)">--% BEAR</div>
         <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelNeutPct" style="background:rgba(150,160,190,.06);color:var(--text2)">--% NEU</div>
@@ -1749,8 +1789,9 @@ function updateDebugPanel(a, prevDir, tradeResult){
   else trBadge='<span style="background:rgba(255,255,255,.05);color:var(--text2);padding:1px 7px;border-radius:4px;font-size:9px">⏳ WAITING</span>';
 
   // Indicator rows
-  var checks=a.checks||[];
-  var indRows=checks.map(function(ck){
+  var checksObj=a.checks||{};
+  var checksArr=Object.entries(checksObj).map(function(e){return {v:e[1].v,n:e[0],d:e[1].lbl};});
+  var indRows=checksArr.map(function(ck){
     var v=ck.v;
     var col=v===1?'#00f07a':v===-1?'#ff2d55':'rgba(150,160,190,.5)';
     var ic=v===1?'▲':v===-1?'▼':'─';
