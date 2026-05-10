@@ -684,7 +684,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <script>
 // ==================== STATE ====================
-const SYMS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','FTMUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
+const SYMS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','TRXUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
 // ── Must be at top so loadState() can access it before its definition line ──
 const _STATE_KEY='protradeai_v4_state';
 
@@ -2703,39 +2703,14 @@ var AR = {
   _signalFlashed: false
 };
 
-var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
+var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','TRXUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
 var AR_INTERVAL = 20; // seconds per coin
 
 async function fetchTrendingCoins(){
-  // Fetch top 20 USDT pairs by 24h quote volume from Binance
-  try{
-    var ctrl=new AbortController();
-    var to=setTimeout(function(){ctrl.abort();},8000);
-    var r=await fetch('https://api.binance.com/api/v3/ticker/24hr',{signal:ctrl.signal});
-    clearTimeout(to);
-    if(!r.ok)throw new Error('ticker fail');
-    var data=await r.json();
-    // Filter USDT spot pairs, sort by quoteVolume descending
-    var usdt=data
-      .filter(function(d){return d.symbol.endsWith('USDT')&&parseFloat(d.quoteVolume)>0;})
-      .sort(function(a,b){return parseFloat(b.quoteVolume)-parseFloat(a.quoteVolume)})
-      .slice(0,30)
-      .map(function(d){return d.symbol;});
-
-    // Merge: always keep AR_FIXED coins, add trending ones up to 20 total
-    var merged=AR_FIXED.slice();
-    for(var i=0;i<usdt.length&&merged.length<20;i++){
-      if(merged.indexOf(usdt[i])===-1) merged.push(usdt[i]);
-    }
-    AR.coins=merged;
-    AR._coinsLoaded=true;
-    log('🔄 Auto-rotate list updated: '+merged.map(function(s){return s.replace('USDT','');}).join(', '),'var(--blue)');
-  }catch(e){
-    // Fallback to SYMS list
-    AR.coins=SYMS.slice();
-    AR._coinsLoaded=true;
-    log('🔄 Auto-rotate using default list (Binance ticker unavailable)','var(--gold)');
-  }
+  // Always use fixed trusted list — no random Binance trending coins
+  AR.coins=AR_FIXED.slice();
+  AR._coinsLoaded=true;
+  log('🔄 AI Scan list: '+AR.coins.map(function(s){return s.replace('USDT','');}).join(', '),'var(--blue)');
 }
 
 // ── AI scan button state ──────────────────────────────────────────────
@@ -3182,7 +3157,7 @@ function loadState(){
 
 // ==================== MULTI-COIN AI MONITOR ====================
 var _mcMonRunning=false;
-var SCAN_SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','FTMUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
+var SCAN_SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','TRXUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
 
 async function runMultiCoinMonitor(){
   if(_mcMonRunning){return;}
