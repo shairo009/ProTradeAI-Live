@@ -2454,7 +2454,6 @@ function loadSym(){loadSymbol();}
 
 log('🚀 ProTrade AI v4.1 — Confluence + HTF Trend Filter online','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
-log('💰 Paper balance: ₹10,000 | Auto trade: ON','var(--green)');
 
 // Show API key badge state on load
 updateApiBadge();
@@ -2464,6 +2463,13 @@ if(getGeckoKey()){
 
 // ── LOAD SAVED STATE BEFORE ANYTHING ──
 loadState();
+log('💰 Paper balance: ₹'+S.bal.toLocaleString('en-IN',{minimumFractionDigits:2})+' | Auto trade: ON','var(--green)');
+
+// ── AUTO-SAVE: save state every 30 seconds as backup ──
+setInterval(saveState, 30000);
+
+// ── SAVE ON PAGE CLOSE / REFRESH ──
+window.addEventListener('beforeunload', saveState);
 
 // Use requestAnimationFrame so first render happens AFTER browser layout
 // This guarantees cWrap.clientWidth/clientHeight are non-zero on first renderAll()
