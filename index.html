@@ -1363,22 +1363,33 @@ function calcInds(){
 // ==================== AI ADAPTIVE MEMORY ====================
 var AIMemory = (function(){
   var KEYS = ['rsi','macd','ma','stoch','bb','st','pattern'];
-  var LS_KEY = 'ptai_memory_v2';
-  var data = {weights:{},stats:{},totalTrades:0};
+  var LS_KEY = 'ptai_memory_v3';
+  var data = {weights:{},stats:{},totalTrades:0,glmAdjustments:0,glmLastNote:'',glmLog:[]};
 
   function _def(){
-    var d={weights:{},stats:{},totalTrades:0};
+    var d={weights:{},stats:{},totalTrades:0,glmAdjustments:0,glmLastNote:'',glmLog:[]};
     KEYS.forEach(function(k){d.weights[k]=1.0;d.stats[k]={w:0,l:0};});
     return d;
   }
 
   function load(){
-    try{var raw=localStorage.getItem(LS_KEY);if(raw){data=JSON.parse(raw);KEYS.forEach(function(k){if(!data.weights[k])data.weights[k]=1.0;if(!data.stats[k])data.stats[k]={w:0,l:0};});}}
-    catch(e){data=_def();}
+    try{
+      var raw=localStorage.getItem(LS_KEY);
+      if(raw){
+        data=JSON.parse(raw);
+        KEYS.forEach(function(k){
+          if(!data.weights[k])data.weights[k]=1.0;
+          if(!data.stats[k])data.stats[k]={w:0,l:0};
+        });
+        if(!data.glmLog)data.glmLog=[];
+        if(!data.glmAdjustments)data.glmAdjustments=0;
+      }
+    }catch(e){data=_def();}
   }
 
   function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}
 
+  // Rule-based learning (fast, per-trade)
   function learn(trade){
     if(!trade||!trade.checks||!trade.status)return;
     var isWin=trade.status==='WIN';
@@ -1388,39 +1399,103 @@ var AIMemory = (function(){
       var ck=trade.checks[k];
       if(!ck||ck.v===0)return;
       var agreed=(ck.v===tradeDir);
-      if(isWin&&agreed){
-        data.weights[k]=Math.min(1.6,data.weights[k]*1.07);
-        data.stats[k].w++;
-      }else if(!isWin&&agreed){
-        data.weights[k]=Math.max(0.25,data.weights[k]*0.88);
-        data.stats[k].l++;
-      }else if(isWin&&!agreed){
-        data.weights[k]=Math.min(1.6,data.weights[k]*1.02);
-      }else if(!isWin&&!agreed){
-        data.weights[k]=Math.min(1.6,data.weights[k]*1.03);
-        data.stats[k].w++;
-      }
+      if(isWin&&agreed){data.weights[k]=Math.min(1.6,data.weights[k]*1.07);data.stats[k].w++;}
+      else if(!isWin&&agreed){data.weights[k]=Math.max(0.25,data.weights[k]*0.88);data.stats[k].l++;}
+      else if(isWin&&!agreed){data.weights[k]=Math.min(1.6,data.weights[k]*1.02);}
+      else if(!isWin&&!agreed){data.weights[k]=Math.min(1.6,data.weights[k]*1.03);data.stats[k].w++;}
     });
-    // Slow regression to 1.0 to prevent runaway weights
     KEYS.forEach(function(k){data.weights[k]+=(1.0-data.weights[k])*0.015;});
     save();
     renderMemoryPanel();
   }
 
+  // GLM-based learning (deep, from AI analysis)
+  function applyGLMFeedback(suggestions, note){
+    if(!suggestions)return;
+    var changed=[];
+    KEYS.forEach(function(k){
+      if(typeof suggestions[k]==='number'){
+        var oldW=data.weights[k]||1.0;
+        // Blend: 70% existing + 30% GLM suggestion (trust but verify)
+        var newW=oldW*0.7+suggestions[k]*0.3;
+        data.weights[k]=Math.max(0.2,Math.min(1.8,newW));
+        if(Math.abs(data.weights[k]-oldW)>0.02)changed.push(k+'->'+data.weights[k].toFixed(2));
+      }
+    });
+    if(changed.length>0){
+      data.glmAdjustments++;
+      data.glmLastNote=note||'GLM tuned weights';
+      data.glmLog.unshift({time:new Date().toLocaleTimeString(),note:note||'',changed:changed.join(', ')});
+      if(data.glmLog.length>20)data.glmLog.pop();
+      save();
+      renderMemoryPanel();
+    }
+  }
+
+  // Direct weight set (from GLM action commands)
+  function setWeight(key, val){
+    if(!KEYS.includes(key))return;
+    val=Math.max(0.2,Math.min(1.8,parseFloat(val)));
+    data.weights[key]=val;
+    data.glmAdjustments++;
+    data.glmLastNote='GLM set '+key+' to '+val.toFixed(2);
+    save();
+    renderMemoryPanel();
+  }
+
+  // Incremental adjust (from GLM action commands)
+  function adjustWeight(key, delta){
+    if(!KEYS.includes(key))return;
+    var newW=Math.max(0.2,Math.min(1.8,(data.weights[key]||1.0)+parseFloat(delta)));
+    data.weights[key]=newW;
+    data.glmAdjustments++;
+    data.glmLastNote='GLM adjusted '+key+' by '+delta+' -> '+newW.toFixed(2);
+    save();
+    renderMemoryPanel();
+  }
+
+  function getFullStats(){
+    var report=[];
+    KEYS.forEach(function(k){
+      var s=data.stats[k]||{w:0,l:0};
+      var tot=s.w+s.l;
+      var acc=tot>0?Math.round(s.w/tot*100):null;
+      report.push(k+': weight='+( data.weights[k]||1.0).toFixed(2)+'x acc='+(acc!==null?acc+'%':'unknown')+' ('+s.w+'W/'+s.l+'L)');
+    });
+    return report.join(' | ');
+  }
+
   function getWeights(){return data.weights;}
   function getStats(){return data.stats;}
   function getTotalTrades(){return data.totalTrades;}
+  function getGLMLog(){return data.glmLog||[];}
+  function getGLMAdjCount(){return data.glmAdjustments||0;}
+  function getGLMLastNote(){return data.glmLastNote||'';}
 
   function reset(){data=_def();save();renderMemoryPanel();}
 
   load();
-  return{learn:learn,getWeights:getWeights,getStats:getStats,getTotalTrades:getTotalTrades,reset:reset};
+  return{
+    learn:learn,
+    applyGLMFeedback:applyGLMFeedback,
+    setWeight:setWeight,
+    adjustWeight:adjustWeight,
+    getFullStats:getFullStats,
+    getWeights:getWeights,
+    getStats:getStats,
+    getTotalTrades:getTotalTrades,
+    getGLMLog:getGLMLog,
+    getGLMAdjCount:getGLMAdjCount,
+    getGLMLastNote:getGLMLastNote,
+    reset:reset
+  };
 })();
 
 function renderMemoryPanel(){
   var el=document.getElementById('aiMemPanel');
   if(!el)return;
   var w=AIMemory.getWeights(),st=AIMemory.getStats(),tot=AIMemory.getTotalTrades();
+  var glmAdj=AIMemory.getGLMAdjCount(),glmNote=AIMemory.getGLMLastNote(),glmLog=AIMemory.getGLMLog();
   var LABELS={rsi:'RSI(14)',macd:'MACD',ma:'MA Trend',stoch:'Stoch',bb:'Bollinger',st:'Supertrend',pattern:'Pattern'};
   var keys=['rsi','macd','ma','stoch','bb','st','pattern'];
   var rows=keys.map(function(k){
@@ -1440,12 +1515,18 @@ function renderMemoryPanel(){
       +'<span style="width:26px;text-align:right;font-size:8px;color:'+accCol+'">'+accStr+'</span>'
       +'</div>';
   }).join('');
-  var learned=tot>0?'<span style="color:var(--green)">'+tot+' trades learned</span>':'<span style="color:rgba(150,160,190,.4)">Learning from first trades...</span>';
-  el.innerHTML='<div style="margin-bottom:5px;font-size:8px;color:rgba(150,160,190,.5)">Weight &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Mult &nbsp; Acc</div>'
+  var learned=tot>0?'<span style="color:var(--green)">'+tot+' trades</span>':'<span style="color:rgba(150,160,190,.4)">Waiting...</span>';
+  var glmBadge=glmAdj>0?'<span style="color:var(--purple);font-size:7px;background:rgba(191,95,255,.1);border:1px solid rgba(191,95,255,.25);padding:1px 5px;border-radius:3px">🤖 GLM: '+glmAdj+' tuned</span>':'';
+  var lastGLM=glmNote?'<div style="font-size:7px;color:rgba(191,95,255,.7);margin-top:4px;padding:3px 5px;background:rgba(191,95,255,.05);border-left:2px solid rgba(191,95,255,.3);border-radius:0 3px 3px 0">🤖 '+glmNote+'</div>':'';
+  el.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:8px;color:rgba(150,160,190,.5)">Indicator &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Mult &nbsp; Acc</span>'+glmBadge+'</div>'
     +rows
+    +lastGLM
     +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="font-size:8px">'+learned+'</span>'
+    +'<div style="display:flex;gap:4px">'
+    +'<button onclick="glmPeriodicReview()" style="font-size:7px;padding:2px 6px;background:rgba(191,95,255,.1);border:1px solid rgba(191,95,255,.3);color:var(--purple);border-radius:3px;cursor:pointer">🤖 GLM Tune</button>'
     +'<button onclick="AIMemory.reset()" style="font-size:7px;padding:2px 6px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:#ff5252;border-radius:3px;cursor:pointer">RESET</button>'
+    +'</div>'
     +'</div>';
 }
 
@@ -2133,6 +2214,8 @@ function closeTrade(t,closeP,reason){
   log(`${pnl>=0?'✅':'❌'} CLOSED ${t.sym} ${t.dir} | ${pnl>=0?'+':''}$${pnl.toFixed(2)} | ${reason}`,pnl>=0?'var(--green)':'var(--red)');
   saveState();
   AIMemory.learn(t);
+  // GLM deep analysis — async, non-blocking
+  setTimeout(function(){ glmLearnFromTrade(t); }, 500);
 }
 
 function monitorTrades(){
@@ -3559,6 +3642,15 @@ function applyAction(cmd){
   } else if(cmd==='REFRESH_INTEL'){
     if(typeof IntelBot!=='undefined')IntelBot.refresh();
     appendMessage('assistant','Intel Bot refresh ho raha hai!',[]);
+  } else if(cmd.startsWith('SET_WEIGHT:')){
+    var parts=cmd.split(':');
+    if(parts.length>=3){ AIMemory.setWeight(parts[1],parseFloat(parts[2])); appendMessage('assistant','Weight set: '+parts[1]+' = '+parts[2]+'x',[]);}
+  } else if(cmd.startsWith('ADJUST_WEIGHT:')){
+    var parts2=cmd.split(':');
+    if(parts2.length>=3){ AIMemory.adjustWeight(parts2[1],parseFloat(parts2[2])); appendMessage('assistant','Weight adjusted: '+parts2[1]+' by '+parts2[2],[]);}
+  } else if(cmd==='REVIEW_MEMORY'){
+    glmPeriodicReview();
+    appendMessage('assistant','GLM memory review shuru ho gaya...',[]);
   }
   updateChatContext();
 }
@@ -3634,6 +3726,153 @@ async function sendChat(){
 }
 
 function sendQuick(msg){var inp=document.getElementById('chatInput');if(inp)inp.value=msg;sendChat();}
+
+// ==================== 🤖 GLM ↔ MEMORY COLLABORATION ====================
+var _glmLearning = false;
+var _tradesSinceReview = 0;
+var GLM_REVIEW_EVERY = 5; // deep review every 5 trades
+
+// Called after every trade close — GLM analyzes it and tunes Memory weights
+async function glmLearnFromTrade(trade){
+  var key = getNvidiaKey();
+  if(!key || _glmLearning) return;
+  _glmLearning = true;
+  _tradesSinceReview++;
+
+  var checksStr = '';
+  if(trade.checks){
+    var ckKeys = ['rsi','macd','ma','stoch','bb','st','pattern'];
+    checksStr = ckKeys.map(function(k){
+      var c = trade.checks[k];
+      if(!c) return k+':neutral';
+      return k+':'+(c.v===1?'BULL':c.v===-1?'BEAR':'neutral')+' score:'+c.sc;
+    }).join(' | ');
+  }
+
+  var memStats = AIMemory.getFullStats();
+  var prompt = 'You are a trading AI tuning indicator weights for a crypto bot. Analyze this trade and suggest weight adjustments.\n\n'
+    +'TRADE RESULT: '+trade.sym+' '+trade.dir+' '+trade.status+'\n'
+    +'P&L: Rs'+trade.pnl.toFixed(2)+' | Entry:'+trade.entry+' | Exit:'+(trade.exit||'?')+' | Reason:'+trade.reason+'\n'
+    +'Confidence: '+(trade.conf||0).toFixed(0)+'% | Score:'+trade.score+' | Grade:'+(trade.grade||'?')+'\n'
+    +'Indicators at signal time: '+checksStr+'\n\n'
+    +'CURRENT MEMORY WEIGHTS: '+memStats+'\n\n'
+    +'Based on this trade outcome, suggest new weights (0.2 to 1.8 range) for any indicators that need tuning.\n'
+    +'RULES:\n'
+    +'- If indicator agreed with trade direction AND trade WAS a WIN -> increase its weight\n'
+    +'- If indicator agreed with trade direction AND trade WAS a LOSS -> decrease its weight\n'
+    +'- Only change weights that need significant adjustment (>0.1 change)\n'
+    +'- Be conservative, do not change weights by more than 0.15 at once\n\n'
+    +'Respond ONLY with valid JSON (no extra text):\n'
+    +'{"weights":{"rsi":1.0,"macd":1.0,"ma":1.0,"stoch":1.0,"bb":1.0,"st":1.0,"pattern":1.0},"note":"1 sentence explanation in Hinglish"}';
+
+  try{
+    var ctrl = new AbortController();
+    var to = setTimeout(function(){ctrl.abort();}, 30000);
+    var resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST', signal: ctrl.signal,
+      headers: {'Authorization':'Bearer '+key, 'Content-Type':'application/json'},
+      body: JSON.stringify({model:'z-ai/glm4.7', messages:[{role:'user',content:prompt}], max_tokens:300, temperature:0.2})
+    });
+    clearTimeout(to);
+    if(resp.ok){
+      var data = await resp.json();
+      var text = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+      var jsonMatch = text.match(/\{[\s\S]*\}/);
+      if(jsonMatch){
+        try{
+          var parsed = JSON.parse(jsonMatch[0]);
+          if(parsed.weights){ AIMemory.applyGLMFeedback(parsed.weights, parsed.note||'Trade analysis'); }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+
+  _glmLearning = false;
+
+  // Every N trades, do a full deep review
+  if(_tradesSinceReview >= GLM_REVIEW_EVERY){
+    _tradesSinceReview = 0;
+    setTimeout(glmPeriodicReview, 2000);
+  }
+}
+
+// Full deep review — GLM looks at all recent trades and memory stats together
+async function glmPeriodicReview(){
+  var key = getNvidiaKey();
+  if(!key) return;
+
+  var recentTrades = (S.trades||[]).slice(-15).map(function(t){
+    var ckStr = '';
+    if(t.checks){
+      var ckKeys = ['rsi','macd','ma','stoch','bb','st','pattern'];
+      ckStr = ckKeys.filter(function(k){return t.checks[k]&&t.checks[k].v!==0;})
+        .map(function(k){return k+':'+(t.checks[k].v===1?'B':'S');}).join(',');
+    }
+    return t.sym+' '+t.dir+' '+t.status+' Rs'+t.pnl.toFixed(0)+' ['+ckStr+']';
+  }).join('\n');
+
+  var memStats = AIMemory.getFullStats();
+  var wins = (S.trades||[]).filter(function(t){return t.status==='WIN';}).length;
+  var losses = (S.trades||[]).filter(function(t){return t.status==='LOSS';}).length;
+  var wr = (wins+losses)>0?Math.round(wins/(wins+losses)*100):0;
+
+  var prompt = 'You are a meta-learning AI for a crypto trading bot. Review the last 15 trades and current indicator weights, then suggest optimized weights to improve win rate.\n\n'
+    +'CURRENT WIN RATE: '+wr+'% ('+wins+'W/'+losses+'L)\n\n'
+    +'LAST 15 TRADES (sym dir result pnl [indicators that agreed: B=Bull S=Sell]):\n'+recentTrades+'\n\n'
+    +'CURRENT WEIGHTS & ACCURACY: '+memStats+'\n\n'
+    +'TASK: Analyze which indicators are most/least reliable in these trades. Suggest new weights.\n'
+    +'- Weights range: 0.2 (unreliable, reduce influence) to 1.8 (very reliable, increase influence)\n'
+    +'- Be data-driven: look at which indicators agreed with winning trades vs losing trades\n'
+    +'- If an indicator consistently agreed with losses, reduce weight below 0.8\n'
+    +'- If an indicator consistently agreed with wins, increase weight above 1.2\n\n'
+    +'Respond ONLY with valid JSON:\n'
+    +'{"weights":{"rsi":1.0,"macd":1.0,"ma":1.0,"stoch":1.0,"bb":1.0,"st":1.0,"pattern":1.0},"note":"Hinglish mein 1-2 sentence insight","best_indicator":"name","worst_indicator":"name"}';
+
+  try{
+    var ctrl = new AbortController();
+    var to = setTimeout(function(){ctrl.abort();}, 40000);
+    var resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method:'POST', signal:ctrl.signal,
+      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+      body:JSON.stringify({model:'z-ai/glm4.7', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.2})
+    });
+    clearTimeout(to);
+    if(resp.ok){
+      var data = await resp.json();
+      var text = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+      var jsonMatch = text.match(/\{[\s\S]*\}/);
+      if(jsonMatch){
+        try{
+          var parsed = JSON.parse(jsonMatch[0]);
+          if(parsed.weights){
+            var note = (parsed.note||'Deep review') + (parsed.best_indicator?' | Best:'+parsed.best_indicator:'') + (parsed.worst_indicator?' | Worst:'+parsed.worst_indicator:'');
+            AIMemory.applyGLMFeedback(parsed.weights, note);
+            log('🤖 GLM Memory Review: '+note, 'var(--purple)');
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+}
+
+// Also update buildSystemPrompt to include GLM action examples for weight tuning
+// (this overrides the previous buildSystemPrompt — append at end so it takes precedence)
+var _origBuildSystemPrompt = buildSystemPrompt;
+buildSystemPrompt = function(){
+  var base = _origBuildSystemPrompt();
+  var memFull = AIMemory.getFullStats();
+  var glmLog = AIMemory.getGLMLog().slice(0,3).map(function(l){return l.time+': '+l.note+' ['+l.changed+']';}).join('\n')||'None yet';
+  return base
+    +'\n\n=== FULL MEMORY STATS (detailed) ===\n'+memFull
+    +'\n\n=== GLM PREVIOUS ADJUSTMENTS ===\n'+glmLog
+    +'\n\n=== WEIGHT CONTROL ACTIONS ===\n'
+    +'You can directly tune indicator weights using these ACTION commands:\n'
+    +'[ACTION: RSI weight badhao | SET_WEIGHT:rsi:1.4]\n'
+    +'[ACTION: Stoch kam reliable hai | SET_WEIGHT:stoch:0.6]\n'
+    +'[ACTION: MACD thoda adjust karo | ADJUST_WEIGHT:macd:+0.1]\n'
+    +'[ACTION: Full GLM review karo | REVIEW_MEMORY]\n'
+    +'Always analyze the data first, then suggest specific weight changes with reasoning.';
+};
 </script>
 </body>
 </html>
