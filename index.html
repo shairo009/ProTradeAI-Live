@@ -1361,7 +1361,9 @@ async function loadSymbol(){
   log('✅ '+klines.length+' candles ready ['+S.sym+' '+S.tf+'] Source: '+src,'var(--green)');
   connectWS();
   doAI();renderAll();updateUI();
-  buildScanner();
+  // buildScanner is run once at startup — do NOT call here to avoid sidebar flash on every coin switch
+  // Just update the active highlight
+  document.querySelectorAll('.scan-item').forEach(function(el){el.classList.toggle('active',el.dataset.sym===S.sym);});
   fetchMTFSignals();
 }
 
@@ -2214,6 +2216,7 @@ async function buildScanner(){
     if(Math.abs(a.score)>12)signals++;
     let div=document.createElement('div');
     div.className='scan-item'+(sym===S.sym?' active':'');
+    div.dataset.sym=sym;
     div.onclick=()=>{document.getElementById('symSel').value=sym;S.sym=sym;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();document.querySelectorAll('.scan-item').forEach(x=>x.classList.remove('active'));div.classList.add('active');};
     let sc=a.score>=40?'sbs':a.score>=15?'sb2':a.score<=-40?'sss':a.score<=-15?'ss2':'sn';
     let sigTxt=a.score>=40?'STRONG BUY':a.score>=15?'BUY':a.score<=-40?'STRONG SELL':a.score<=-15?'SELL':'NEUTRAL';
