@@ -1983,7 +1983,7 @@ function doAI(){
   var cn=Math.max(a.bullCount,a.bearCount);
   var fgE=FG.value<=35?'🔴':FG.value<=55?'🟡':'🟢';
   var mtfBadge=mtfStatus==='aligned'?' │ ✔HTF':mtfStatus==='opposed'?' │ ⛔HTF':mtfStatus==='warn'?' │ ⚠HTF':'';
-  conf.textContent='Score '+(a.score>0?'+':'')+a.score.toFixed(0)+' │ '+cn+'/7'+mtfBadge+' │ '+fgE+' '+FG.value;
+  conf.textContent='Score '+(a.score>0?'+':'')+a.score.toFixed(0)+' │ '+cn+'/7'+mtfBadge+' │ '+fgE+' '+FG.value;btn.style.display=S.auto?'none':'block';
 
   setM('rsi',a.rsiV<30?85:a.rsiV>70?15:50,a.rsiV<30?'var(--green)':a.rsiV>70?'var(--red)':'var(--gold)',a.rsiV.toFixed(0));
   setM('macd',a.macdV.h>0?75:25,a.macdV.h>0?'var(--green)':'var(--red)',a.macdV.h>0?'BUL':'BEA');
@@ -2702,7 +2702,7 @@ function genReport(){
 }
 
 // ==================== CONTROLS ====================
-function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classList.toggle('on',S.auto);log(S.auto?'🤖 Auto trade ENABLED':'⏸ Auto trade PAUSED','var(--gold)');}
+function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classList.toggle('on',S.auto);var _ab=document.getElementById('aiBtn');if(_ab)_ab.style.display=S.auto?'none':'block';log(S.auto?'🤖 Auto trade ENABLED':'⏸ Auto trade PAUSED','var(--gold)');}
 function manualTrade(){if(!S.lastA)return;if(Math.abs(S.lastA.score)>10)execTrade(S.lastA,false);else log('⚠ Signal too weak for manual trade','var(--gold)');}
 function manClose(id){let t=S.open.find(t=>t.id===id);if(t)closeTrade(t,S.curPrice||t.entry,'Manual Close');}
 function changeSym(){stopAutoRotate();let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
