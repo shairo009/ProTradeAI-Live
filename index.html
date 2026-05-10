@@ -173,6 +173,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 .load-ov{position:absolute;inset:0;background:rgba(6,10,18,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;border-radius:2px;backdrop-filter:blur(4px)}
 .spin{width:48px;height:48px;border:2px solid var(--border2);border-top-color:var(--gold);border-right-color:rgba(255,200,50,.3);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:16px;box-shadow:0 0 20px rgba(255,200,50,.15)}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes arFlashPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.05)}}
 .load-txt{color:var(--gold);font-size:12px;letter-spacing:3px;font-weight:900;text-shadow:0 0 16px rgba(255,200,50,.4)}
 .load-sub{color:var(--text2);font-size:10px;margin-top:6px;letter-spacing:.5px}
 
@@ -322,7 +323,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.5</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.6</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -688,7 +689,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.5 | 7-Check Confluence + MTF | 20-Coin Trending Auto-Rotate</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.6 | Signal Flash Auto-Rotate + Trending Coins</span>
 </div>
 
 </div>
@@ -1932,6 +1933,8 @@ function doAI(){
     btn.className='ai-btn btn-wait'; btn.textContent='⟳ Waiting for confluence...';
   }
   updateMTFPanel();
+  // 🔄 Signal flash hook for auto-rotate
+  if(AR.active) arSignalFlash(a);
 
   // ── MTF TREND FILTER ─────────────────────────────────────────
   // 1H + 4H must align with signal direction, else block/warn
@@ -2687,7 +2690,8 @@ var AR = {
   idx: 0,             // current position
   countdown: 20,      // seconds per coin
   _cdTimer: null,     // countdown interval
-  _coinsLoaded: false
+  _coinsLoaded: false,
+  _signalFlashed: false  // prevent repeated extension per coin visit
 };
 
 var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
@@ -2766,6 +2770,8 @@ async function _arSwitchTo(idx){
   document.querySelectorAll('.scan-item').forEach(function(el){
     el.classList.toggle('active',el.dataset.sym===sym);
   });
+  // Reset signal flash state for new coin
+  AR._signalFlashed=false;
   // Close WS, load new symbol
   if(S.ws){try{S.ws.close();}catch(e){}}
   log('🔄 Auto-rotate → '+sym.replace('USDT','')+'/USDT ('+(AR.idx+1)+'/'+AR.coins.length+')','var(--blue)');
@@ -2793,6 +2799,52 @@ async function startAutoRotate(){
       _arSwitchTo(AR.idx+1);
     }
   },1000);
+}
+
+// Called from doAI() when auto-rotate is active — extends stay on strong signals
+var AR_EXTEND = 40;         // extra seconds added on signal flash
+var AR_EXTEND_MAX = 90;     // absolute max seconds to stay on one coin
+
+function arSignalFlash(a){
+  if(!AR.active||AR._signalFlashed)return;
+  var isStrong=(a.isBuy||a.isSell);
+  var isWeak=(a.isBuyWeak||a.isSellWeak);
+  if(!isStrong&&!isWeak)return;
+  AR._signalFlashed=true;
+
+  var dir=a.isBuy||a.isBuyWeak?'BUY':'SELL';
+  var col=dir==='BUY'?'var(--green)':'var(--red)';
+  var icon=dir==='BUY'?'⬆':'⬇';
+  var extra=isStrong?AR_EXTEND:Math.round(AR_EXTEND/2);
+  var newCd=Math.min(AR.countdown+extra, AR_EXTEND_MAX);
+  AR.countdown=newCd;
+
+  // Flash the rotate bar
+  var bar=document.getElementById('rotateBar');
+  var symLbl=document.getElementById('rotateSymLabel');
+  var cdLbl=document.getElementById('rotateCdLabel');
+  if(!bar)return;
+
+  // Show signal badge in bar
+  var existing=bar.querySelector('#arSigBadge');
+  if(existing)existing.remove();
+  var badge=document.createElement('span');
+  badge.id='arSigBadge';
+  badge.style.cssText='font-size:9px;font-weight:900;padding:2px 8px;border-radius:4px;animation:arFlashPulse 0.6s ease-in-out 5;border:1px solid '+(dir==='BUY'?'rgba(0,230,118,.5)':'rgba(255,45,85,.5)')+';background:'+(dir==='BUY'?'rgba(0,230,118,.15)':'rgba(255,45,85,.15)')+';color:'+col;
+  badge.textContent=icon+' '+a.grade+' '+dir+(isStrong?' ★':'');
+  bar.insertBefore(badge, cdLbl);
+
+  // Flash bar background
+  bar.style.background=dir==='BUY'?'rgba(0,230,118,.12)':'rgba(255,45,85,.12)';
+  bar.style.borderBottomColor=dir==='BUY'?'rgba(0,230,118,.3)':'rgba(255,45,85,.3)';
+  setTimeout(function(){
+    bar.style.background='rgba(61,142,255,.08)';
+    bar.style.borderBottomColor='rgba(61,142,255,.2)';
+  }, 3000);
+
+  _arUpdateUI();
+  var sym=(AR.coins[AR.idx]||'').replace('USDT','');
+  log('⚡ SIGNAL FLASH — '+icon+' '+dir+' ('+a.grade+') on '+sym+' — staying '+(extra+0)+'s longer!', col);
 }
 
 function stopAutoRotate(){
@@ -3054,7 +3106,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.5 — Trending Auto-Rotate + Parallel Monitor active','var(--gold)');
+log('🚀 ProTrade AI v4.6 — Signal Flash + Trending Auto-Rotate active','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
