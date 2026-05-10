@@ -1717,11 +1717,11 @@ function analyze(candles,curPrice){
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
 
-  // SIGNAL DECISION — world-class strict thresholds (5/7 confluence + high score)
-  var isBuy=totalScore>=40&&bullCount>=6&&!isBlocked;
-  var isBuyWeak=totalScore>=26&&bullCount>=5&&!isBlocked;
-  var isSell=totalScore<=-40&&bearCount>=6&&!isBlocked;
-  var isSellWeak=totalScore<=-26&&bearCount>=5&&!isBlocked;
+  // SIGNAL DECISION — 5/7 confluence required
+  var isBuy=totalScore>=40&&bullCount>=5&&!isBlocked;
+  var isBuyWeak=totalScore>=26&&bullCount>=4&&!isBlocked;
+  var isSell=totalScore<=-40&&bearCount>=5&&!isBlocked;
+  var isSellWeak=totalScore<=-26&&bearCount>=4&&!isBlocked;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
