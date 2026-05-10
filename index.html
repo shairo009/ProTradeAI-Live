@@ -1808,11 +1808,11 @@ function analyze(candles,curPrice){
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
 
-  // SIGNAL DECISION — 5/7 confluence required
-  var isBuy=totalScore>=40&&bullCount>=5;
-  var isBuyWeak=totalScore>=26&&bullCount>=4;
-  var isSell=totalScore<=-40&&bearCount>=5;
-  var isSellWeak=totalScore<=-26&&bearCount>=4;
+  // SIGNAL DECISION — 6/7 confluence required (strict mode)
+  var isBuy=totalScore>=40&&bullCount>=6;
+  var isBuyWeak=false;
+  var isSell=totalScore<=-40&&bearCount>=6;
+  var isSellWeak=false;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
@@ -1975,8 +1975,8 @@ function doAI(){
     if((a.isBuy||a.isBuyWeak)&&_mth>18&&_mt4>18)_preMtfAlign=true;
     if((a.isSell||a.isSellWeak)&&_mth<-18&&_mt4<-18)_preMtfAlign=true;
   }
-  // Grade gate: strong signal needs ≥B; weak needs A+
-  var _gradeOk=(a.grade==='A+'||a.grade==='A'||a.grade==='B'||a.grade==='C');
+  // Grade gate: auto trade only on A or A+ grade (6/7 strict mode)
+  var _gradeOk=(a.grade==='A+'||a.grade==='A');
   var _gradeStrict=(a.grade==='A+');
   var _drLabel='';
 
@@ -2379,7 +2379,10 @@ function closeTrade(t,closeP,reason){
 
 function monitorTrades(){
   let pr=S.curPrice;if(!pr)return;
+  let now=Date.now();
   [...S.open].forEach(t=>{
+    // guard: trade must be for the same symbol currently loaded
+    if(t.sym!==S.sym)return;
     t.ticksOpen++;
     t.pnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
     if(t.dir==='BUY'){
@@ -2396,9 +2399,29 @@ function monitorTrades(){
       if(pr<=t.tp1&&t.tpHit<1){t.tpHit=1;log('🎯 TP1 hit: '+t.sym,'var(--green)');}
     }
     if(t.pnl<-t.riskAmt*1.8){closeTrade(t,pr,'Max Loss Cut');return;}
-    if(t.ticksOpen>150&&Math.abs(t.pnl)<t.riskAmt*0.05){closeTrade(t,pr,'Time Stop');}
-    if(S.trailEnabled&&t.pnl>0){var atrV2=S.ind.atr?S.ind.atr[S.ind.atr.length-1]:pr*0.01;if(t.dir==='BUY'){var ns=pr-atrV2*1.5;if(ns>t.sl){t.sl=ns;}}else{var ns2=pr+atrV2*1.5;if(ns2<t.sl){t.sl=ns2;}}}
+    // Real-time based stop: 45 min max open (not tick-based — prevents stuck trades)
+    if((now-t.openTs)>45*60*1000&&Math.abs(t.pnl)<t.riskAmt*0.08){closeTrade(t,pr,'Time Stop ⏰');return;}
+    if(S.trailEnabled&&t.pnl>0){var atrV2=S.ind&&S.ind.atr?S.ind.atr[S.ind.atr.length-1]:pr*0.01;if(t.dir==='BUY'){var ns=pr-atrV2*1.5;if(ns>t.sl){t.sl=ns;}}else{var ns2=pr+atrV2*1.5;if(ns2<t.sl){t.sl=ns2;}}}
   });
+}
+// Real-time trade watchdog — runs every 30s independent of price ticks
+// Prevents trades from getting stuck when WebSocket/polling fails
+if(!window._tradeWatchdog){
+  window._tradeWatchdog=setInterval(function(){
+    if(!S.open||!S.open.length)return;
+    let pr=S.curPrice;
+    let now=Date.now();
+    [...S.open].forEach(function(t){
+      // Force-close trades stuck open > 2 hours with no price update
+      let age=(now-t.openTs)/60000;
+      if(age>120){
+        let exitPr=pr||t.entry;
+        log('⏰ Force-close: '+t.sym+' open '+Math.round(age)+'min — unstuck','var(--gold)');
+        closeTrade(t,exitPr,'Watchdog Close ⏰');
+      }
+    });
+    if(S.dataReady)updateUI();
+  },30000);
 }
 
 // ==================== RENDER ====================
