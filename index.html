@@ -325,6 +325,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <div class="hdr">
   <div class="logo">PRO<span>TRADE</span> AI <sub>v4.7</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
+  <button class="hbtn danger" id="resetBtn" onclick="confirmReset()" style="flex-shrink:0;font-weight:900;font-size:11px;letter-spacing:.5px" title="Reset Account to ₹10,000">↺ RESET</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
     <div class="chip"><div class="cl">BALANCE</div><div class="cv" id="balEl">₹10,000</div></div>
@@ -2929,6 +2930,34 @@ function switchV(v){
 
 
 function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;S.equityHistory=[];localStorage.removeItem('protradeai_v4_state');log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
+function confirmReset(){
+  var btn=document.getElementById('resetBtn');
+  if(btn._confirming){
+    clearTimeout(btn._confTO);
+    btn._confirming=false;
+    btn.textContent='↺ RESET';
+    btn.style.background='rgba(255,45,85,.08)';
+    resetAcc();
+    btn.textContent='✅ DONE!';
+    btn.style.background='rgba(0,240,122,.12)';
+    btn.style.borderColor='rgba(0,240,122,.4)';
+    btn.style.color='var(--green)';
+    setTimeout(function(){btn.textContent='↺ RESET';btn.style.background='rgba(255,45,85,.08)';btn.style.borderColor='rgba(255,45,85,.3)';btn.style.color='var(--red)';},1500);
+    return;
+  }
+  btn._confirming=true;
+  btn.textContent='⚠ SURE?';
+  btn.style.background='rgba(255,45,85,.25)';
+  btn.style.borderColor='rgba(255,45,85,.7)';
+  btn.style.color='#fff';
+  btn._confTO=setTimeout(function(){
+    btn._confirming=false;
+    btn.textContent='↺ RESET';
+    btn.style.background='rgba(255,45,85,.08)';
+    btn.style.borderColor='rgba(255,45,85,.3)';
+    btn.style.color='var(--red)';
+  },3000);
+}
 function log(msg,col){
   let l=document.getElementById('aiLog'),d=document.createElement('div');
   d.className='li';d.innerHTML=`<span class="lt">[${new Date().toLocaleTimeString()}] </span><span style="color:${col||'var(--text)'}">${msg}</span>`;
