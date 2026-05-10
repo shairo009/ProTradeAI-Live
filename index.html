@@ -3531,10 +3531,10 @@ function buildSystemPrompt(liveData){
   // Build live internet data section
   var liveSection = '';
   if(liveData){
-    liveSection += '=== LIVE MARKET DATA (fetched right now) ===\n';
+    liveSection = '=== LIVE MARKET DATA (fetched just now) ===\n';
     if(liveData.prices && liveData.prices.length){
-      liveSection += 'LIVE PRICES:\n';
-      liveData.prices.forEach(function(p){ liveSection += p.sym+': 
+      liveSection += 'LIVE PRICES: ';
+      liveSection += liveData.prices.map(function(p){return p.sym+'=
 
 function openAIChat(){
   var m=document.getElementById('aiChatModal');
@@ -3675,7 +3675,6 @@ async function sendChat(){
   _chatTyping=true;
   appendTyping();
   setChatStatus('🌐 LIVE DATA...','gold');
-  // Fetch real-time data before building prompt
   var liveData = await fetchLiveDataForChat();
   setChatStatus('THINKING...','gold');
   var sysPrompt=buildSystemPrompt(liveData);
@@ -3860,28 +3859,86 @@ buildSystemPrompt = function(liveData){
     +'[ACTION: Full GLM review karo | REVIEW_MEMORY]\n'
     +'Always analyze the data first, then suggest specific weight changes with reasoning.';
 };
+
+// ========== LIVE DATA FETCHER FOR GLM (uses AbortController, no AbortSignal.timeout) ==========
+var _liveDataCache = null;
+var _liveDataCacheTime = 0;
+var LIVE_CACHE_MS = 90000;
+
+function _makeAbortCtrl(ms){
+  var ctrl = new AbortController();
+  setTimeout(function(){ctrl.abort();}, ms);
+  return ctrl;
+}
+
+async function fetchLiveDataForChat(){
+  if(_liveDataCache && (Date.now()-_liveDataCacheTime) < LIVE_CACHE_MS){ return _liveDataCache; }
+  var result = {prices:[],news:[],reddit:[],fearGreed:null,error:''};
+  var errors = [];
+
+  // 1. Live prices — Binance
+  var coinPairs = [{sym:'BTC',pair:'BTCUSDT'},{sym:'ETH',pair:'ETHUSDT'},{sym:'BNB',pair:'BNBUSDT'},{sym:'SOL',pair:'SOLUSDT'},{sym:'XRP',pair:'XRPUSDT'}];
+  try{
+    var pricePromises = coinPairs.map(function(c){
+      return fetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+c.pair, {signal:_makeAbortCtrl(5000).signal})
+        .then(function(r){return r.ok?r.json():null;})
+        .then(function(d){return d?{sym:c.sym,price:parseFloat(d.lastPrice).toFixed(c.sym==='BTC'?0:2),chg24h:parseFloat(d.priceChangePercent).toFixed(2)}:null;})
+        .catch(function(){return null;});
+    });
+    var pr = await Promise.all(pricePromises);
+    result.prices = pr.filter(Boolean);
+  }catch(e){errors.push('prices');}
+
+  // 2. Fear & Greed — Alternative.me
+  try{
+    var fgR = await fetch('https://api.alternative.me/fng/?limit=1', {signal:_makeAbortCtrl(5000).signal});
+    if(fgR.ok){var fgD=await fgR.json();var fg=fgD.data&&fgD.data[0];if(fg)result.fearGreed={value:fg.value,label:fg.value_classification};}
+  }catch(e){errors.push('fg');}
+
+  // 3. CryptoCompare News
+  try{
+    var nR = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=10&sortOrder=latest', {signal:_makeAbortCtrl(6000).signal,mode:'cors'});
+    if(nR.ok){var nD=await nR.json();result.news=(nD.Data||[]).slice(0,8).map(function(n){return {title:n.title,time:new Date(n.published_on*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}; });}
+  }catch(e){errors.push('news');}
+
+  // 4. Reddit
+  try{
+    var subs=['CryptoCurrency','Bitcoin','ethtrader'];
+    var rfetches=subs.map(function(sub){
+      return fetch('https://www.reddit.com/r/'+sub+'/hot.json?limit=4',{signal:_makeAbortCtrl(4000).signal,headers:{'User-Agent':'ProTradeAI/3.0'}})
+        .then(function(r){return r.ok?r.json():null;})
+        .then(function(d){return d?((d.data&&d.data.children)||[]).slice(0,2).map(function(p){return {title:p.data.title,score:p.data.score,sub:sub};}):[];})
+        .catch(function(){return [];});
+    });
+    var rr=await Promise.all(rfetches);
+    result.reddit=[].concat.apply([],rr).sort(function(a,b){return b.score-a.score;}).slice(0,5);
+  }catch(e){errors.push('reddit');}
+
+  if(errors.length)result.error=errors.join(',');
+  _liveDataCache=result;
+  _liveDataCacheTime=Date.now();
+  return result;
+}
 </script>
 </body>
 </html>
-+p.price+(p.chg24h?' ('+p.chg24h+'% 24h)':'')+'\n'; });
++p.price+(p.chg24h?' ('+p.chg24h+'%24h)':'');}).join(' | ')+'\n';
     }
     if(liveData.fearGreed){
-      var fg = liveData.fearGreed;
-      liveSection += 'FEAR & GREED INDEX: '+fg.value+'/100 ('+fg.label+')\n';
+      liveSection += 'FEAR & GREED: '+liveData.fearGreed.value+'/100 ('+liveData.fearGreed.label+')\n';
     }
     if(liveData.news && liveData.news.length){
-      liveSection += '\nBREAKING CRYPTO NEWS (just fetched):\n';
-      liveData.news.slice(0,8).forEach(function(n,i){ liveSection += (i+1)+'. ['+n.time+'] '+n.title+'\n'; });
+      liveSection += 'BREAKING NEWS:\n';
+      liveData.news.slice(0,7).forEach(function(n,i){liveSection += (i+1)+'. ['+n.time+'] '+n.title+'\n';});
     }
     if(liveData.reddit && liveData.reddit.length){
-      liveSection += '\nREDDIT TRENDING RIGHT NOW:\n';
-      liveData.reddit.slice(0,5).forEach(function(p,i){ liveSection += (i+1)+'. [r/'+p.sub+'] '+p.title+' ('+p.score+' upvotes)\n'; });
+      liveSection += 'REDDIT TRENDING:\n';
+      liveData.reddit.slice(0,4).forEach(function(p,i){liveSection += (i+1)+'. [r/'+p.sub+'] '+p.title+' ('+p.score+' upvotes)\n';});
     }
-    if(liveData.error){ liveSection += '(Some data sources unavailable: '+liveData.error+')\n'; }
     liveSection += '\n';
   }
 
-  return 'You are an expert crypto trading AI assistant embedded inside ProTrade AI v3.0 terminal. You have FULL ACCESS to real-time market data fetched just now, plus all terminal trading data.\n\n'
+  return 'You are an expert crypto trading AI assistant in ProTrade AI v3.0 terminal. You have REAL-TIME internet data (fetched seconds ago) plus full terminal access.\n\n'
     +'=== TERMINAL STATE ('+now+') ===\n'
     +'Symbol: '+(S.sym||'?')+' | Timeframe: '+(S.tf||'5m')+' | Balance: Rs'+bal+'\n'
     +'Auto-Trade: '+(S.auto?'ON':'OFF')+' | Risk: '+riskPct+'%\n\n'
@@ -3895,16 +3952,15 @@ buildSystemPrompt = function(liveData){
     +'Sentiment: '+intelSent+' | Trade Bias: '+intelBias+'\n\n'
     +liveSection
     +'=== YOUR CAPABILITIES ===\n'
-    +'- Analyze real-time news, prices, Reddit sentiment\n'
+    +'- Analyze real-time news, live prices, Reddit sentiment\n'
     +'- Analyze all trade data and give specific advice\n'
     +'- Suggest which coin to trade, direction, timing\n'
     +'- Explain any loss or win in detail\n'
-    +'- Review AI memory weights\n'
     +'- Suggest setting changes via ACTION blocks\n\n'
-    +'For ACTIONS use this format (on its own line):\n'
+    +'For ACTIONS use this format:\n'
     +'[ACTION: description | command]\n'
     +'Commands: SET_RISK:3, SET_AUTO:ON, SET_AUTO:OFF, REFRESH_INTEL\n\n'
-    +'Always respond in Hinglish (Hindi+English mix). Be direct, specific, actionable. Use bullet points. Reference actual news headlines when relevant.';
+    +'Always respond in Hinglish (Hindi+English mix). Be direct, specific, actionable. Reference actual news when relevant.';
 }
 
 function openAIChat(){
@@ -4046,7 +4102,6 @@ async function sendChat(){
   _chatTyping=true;
   appendTyping();
   setChatStatus('🌐 LIVE DATA...','gold');
-  // Fetch real-time data before building prompt
   var liveData = await fetchLiveDataForChat();
   setChatStatus('THINKING...','gold');
   var sysPrompt=buildSystemPrompt(liveData);
@@ -4231,99 +4286,6 @@ buildSystemPrompt = function(){
     +'[ACTION: Full GLM review karo | REVIEW_MEMORY]\n'
     +'Always analyze the data first, then suggest specific weight changes with reasoning.';
 };
-
-// ==================== 🌐 REAL-TIME DATA FETCHER FOR GLM ====================
-var _liveDataCache = null;
-var _liveDataCacheTime = 0;
-var LIVE_CACHE_MS = 90000; // 90 second cache — don't hammer APIs
-
-async function fetchLiveDataForChat(){
-  // Use cache if fresh
-  if(_liveDataCache && (Date.now()-_liveDataCacheTime) < LIVE_CACHE_MS){
-    return _liveDataCache;
-  }
-
-  var result = { prices:[], news:[], reddit:[], fearGreed:null, error:'' };
-  var errors = [];
-
-  // 1. Live prices — Binance (no key needed)
-  var coinPairs = [
-    {sym:'BTC', pair:'BTCUSDT'},
-    {sym:'ETH', pair:'ETHUSDT'},
-    {sym:'BNB', pair:'BNBUSDT'},
-    {sym:'SOL', pair:'SOLUSDT'},
-    {sym:'XRP', pair:'XRPUSDT'}
-  ];
-  try{
-    var priceUrls = coinPairs.map(function(c){
-      return fetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+c.pair, {signal:AbortSignal.timeout(5000)})
-        .then(function(r){return r.ok?r.json():null;})
-        .then(function(d){
-          if(!d)return null;
-          return {sym:c.sym, price:parseFloat(d.lastPrice).toFixed(c.sym==='BTC'?0:2), chg24h:parseFloat(d.priceChangePercent).toFixed(2)};
-        }).catch(function(){return null;});
-    });
-    var priceResults = await Promise.all(priceUrls);
-    result.prices = priceResults.filter(Boolean);
-  }catch(e){ errors.push('prices'); }
-
-  // 2. Fear & Greed index — Alternative.me (free, no key)
-  try{
-    var fgR = await fetch('https://api.alternative.me/fng/?limit=1', {signal:AbortSignal.timeout(5000)});
-    if(fgR.ok){
-      var fgD = await fgR.json();
-      var fgItem = fgD.data&&fgD.data[0];
-      if(fgItem){ result.fearGreed = {value:fgItem.value, label:fgItem.value_classification}; }
-    }
-  }catch(e){ errors.push('feargreed'); }
-
-  // 3. CryptoCompare News (free, no key needed)
-  try{
-    var newsR = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=12&sortOrder=latest', {signal:AbortSignal.timeout(6000), mode:'cors'});
-    if(newsR.ok){
-      var newsD = await newsR.json();
-      result.news = (newsD.Data||[]).slice(0,10).map(function(n){
-        return {
-          title: n.title,
-          source: (n.source_info&&n.source_info.name)||n.source||'',
-          time: new Date(n.published_on*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-        };
-      });
-    }
-  }catch(e){ errors.push('news'); }
-
-  // 4. Reddit trending (free JSON API)
-  try{
-    var subs = ['CryptoCurrency','Bitcoin','ethtrader'];
-    var redditFetches = subs.map(function(sub){
-      return fetch('https://www.reddit.com/r/'+sub+'/hot.json?limit=4', {
-        signal:AbortSignal.timeout(5000),
-        headers:{'User-Agent':'ProTradeAI/3.0'}
-      }).then(function(r){return r.ok?r.json():null;})
-        .then(function(d){
-          if(!d)return [];
-          return ((d.data&&d.data.children)||[]).slice(0,3).map(function(p){
-            return {title:p.data.title, score:p.data.score, sub:sub};
-          });
-        }).catch(function(){return [];});
-    });
-    var redditResults = await Promise.all(redditFetches);
-    result.reddit = [].concat.apply([], redditResults)
-      .sort(function(a,b){return b.score-a.score;})
-      .slice(0,6);
-  }catch(e){ errors.push('reddit'); }
-
-  if(errors.length) result.error = errors.join(', ');
-
-  // Update Intel Bot panel with fresh news if available
-  if(result.news && result.news.length && typeof S !== 'undefined'){
-    S.liveNewsForGLM = result.news;
-  }
-
-  _liveDataCache = result;
-  _liveDataCacheTime = Date.now();
-  return result;
-}
 </script>
 </body>
 </html>
