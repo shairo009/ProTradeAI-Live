@@ -300,6 +300,11 @@ tr:hover td{background:rgba(61,142,255,.04)}
   .status-pill{font-size:8px;padding:2px 7px;letter-spacing:0}
   .scanner{width:175px;min-width:155px}
   .right{width:220px}
+  .hdr-secondary{display:none!important}
+  /* hide Equity + Open chips to save space; Balance + P&L remain */
+  #eqEl{display:none}
+  #opEl{display:none}
+  #eqEl,.chip:has(#eqEl),.chip:has(#opEl){display:none!important}
 }
 @media (max-width:900px){
   #fgChipWrap{display:none!important}
@@ -333,12 +338,12 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn" onclick="switchV('botcheck')" id="btnBot">&#129302; Bot Check</button>
     <button class="hbtn" onclick="openDoctor()" id="btnDr" style="border-color:rgba(255,180,0,.4);color:#ffc832">🩺 Doctor</button>
     <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
-    <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
-    <span class="api-badge no-key" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
-    <button class="hbtn" id="sndBtn" onclick="toggleSound()">🔊 Snd ON</button>
-    <button class="hbtn" id="trailBtn" onclick="toggleTrail()">🔓 Trail OFF</button>
-    <button class="hbtn danger" onclick="resetAcc()">↺ Reset</button>
     <button class="hbtn" onclick="openAIChat()" id="aichatBtn" style="background:linear-gradient(135deg,rgba(61,142,255,.2),rgba(191,95,255,.2));border-color:rgba(61,142,255,.5);color:var(--cyan);font-weight:900">🤖 AI Chat</button>
+    <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
+    <span class="api-badge no-key hdr-secondary" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
+    <button class="hbtn hdr-secondary" id="sndBtn" onclick="toggleSound()">🔊 Snd ON</button>
+    <button class="hbtn hdr-secondary" id="trailBtn" onclick="toggleTrail()">🔓 Trail OFF</button>
+    <button class="hbtn danger hdr-secondary" onclick="resetAcc()">↺ Reset</button>
   </div>
 </div>
 
