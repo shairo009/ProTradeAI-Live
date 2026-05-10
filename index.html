@@ -2236,7 +2236,7 @@ function execTrade(a,auto,symOverride){
   let now=Date.now();
   let tradeSym=symOverride||S.sym;
   if(now-S.lastTradeT<10000&&auto)return;
-  if(S.open.length>=3){if(auto)return;log('⚠ Max 3 open trades','var(--gold)');return;}
+  if(S.open.length>=5){if(auto)return;log('⚠ Max 5 open trades','var(--gold)');return;}
   if(S.open.find(t=>t.sym===tradeSym)){if(auto)return;log('⚠ Already open: '+tradeSym,'var(--gold)');return;}
   if(S.bal<500){log('❌ Low balance','var(--red)');return;}
 
@@ -2952,9 +2952,9 @@ setTimeout(()=>{ if(typeof buildScanner==='function') buildScanner(); }, 8000);
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
 
-// ── MULTI-COIN AUTO MONITOR: every 90s scan all 20 coins ──
-setTimeout(runMultiCoinMonitor, 15000); // first scan after 15s
-setInterval(runMultiCoinMonitor, 90000); // then every 90s
+// ── MULTI-COIN AUTO MONITOR: every 45s scan all 20 coins ──
+setTimeout(runMultiCoinMonitor, 10000); // first scan after 10s
+setInterval(runMultiCoinMonitor, 45000); // then every 45s
 
 // Safety net: force re-render 1s after load in case RAF was too early
 setTimeout(()=>{if(S.dataReady)renderAll();},1000);
@@ -2997,23 +2997,25 @@ var _mcMonRunning=false;
 var SCAN_SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','FTMUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
 
 async function runMultiCoinMonitor(){
-  if(_mcMonRunning){log('⏳ Multi-scan already running...','var(--gold)');return;}
+  if(_mcMonRunning){return;}
   if(!S.auto){return;} // only when auto-trade is ON
-  if(S.open.length>=3){log('📊 Multi-scan skipped — max trades open','var(--gold)');return;}
+  if(S.open.length>=5){log('📊 Multi-scan skipped — max 5 trades open','var(--gold)');return;}
+  // Doctor Bot block check
+  if(S.consecLoss>=5&&!S.drOverride){
+    log('🩺 Doctor Bot: Auto trading PAUSED ('+S.consecLoss+' consecutive losses)','var(--red)');
+    return;
+  }
   _mcMonRunning=true;
-  log('🔭 Multi-coin scan started — checking all 20 coins...','var(--cyan)');
+  log('🔭 Scanning all 20 coins for signals...','var(--cyan)');
 
-  let best=null;
-  let bestAbs=0;
+  let candidates=[]; // collect ALL valid signals, trade top ones
 
   for(let i=0;i<SCAN_SYMS.length;i++){
     let sym=SCAN_SYMS[i];
-    // Skip if already have open trade on this coin
-    if(S.open.find(t=>t.sym===sym))continue;
-    if(S.open.length>=3)break;
+    if(S.open.find(t=>t.sym===sym))continue; // already in trade
+    if(S.open.length+candidates.filter(c=>c.fired).length>=5)break;
 
     try{
-      // Fetch klines quietly
       let url='https://api.binance.com/api/v3/klines?symbol='+sym+'&interval='+S.tf+'&limit=100';
       let ctrl=new AbortController();
       let to=setTimeout(()=>ctrl.abort(),8000);
@@ -3026,53 +3028,51 @@ async function runMultiCoinMonitor(){
       let klines=raw.map(k=>({t:k[0],o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])}));
       let pr=klines[klines.length-1].c;
 
-      // Run analyze with temp candles
-      let savedCandles=S.candles;
-      let savedSym=S.sym;
-      let savedPrice=S.curPrice;
-      S.candles=klines;
-      S.curPrice=pr;
+      // Analyze with temp state
+      let savedCandles=S.candles,savedSym=S.sym,savedPrice=S.curPrice;
+      S.candles=klines;S.curPrice=pr;
       let a=analyze(klines,pr);
-      S.candles=savedCandles;
-      S.sym=savedSym;
-      S.curPrice=savedPrice;
+      S.candles=savedCandles;S.sym=savedSym;S.curPrice=savedPrice;
 
       if(!a)continue;
       let absScore=Math.abs(a.score);
 
-      // Must be strong signal (score ≥40, grade A/A+)
-      if(absScore>=40&&(a.isBuy||a.isSell)&&(a.grade==='A+'||a.grade==='A')){
-        if(absScore>bestAbs){
-          bestAbs=absScore;
-          best={a,sym,pr};
-          log('🎯 Strong signal: '+(a.isBuy?'BUY':'SELL')+' '+sym+' score:'+a.score.toFixed(0)+' conf:'+a.conf.toFixed(0)+'%',a.isBuy?'var(--green)':'var(--red)');
-        }
+      // Accept: strong signal score≥32 AND grade A+/A/B AND not blocked
+      if(absScore>=32&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B')){
+        candidates.push({a,sym,pr,absScore});
+        log('🎯 '+(a.isBuy?'BUY':'SELL')+' signal: '+sym+' score:'+a.score.toFixed(0)+' grade:'+a.grade+' conf:'+a.conf.toFixed(0)+'%',a.isBuy?'var(--green)':'var(--red)');
       }
     }catch(e){}
 
-    // Small delay to avoid rate limiting
-    await new Promise(res=>setTimeout(res,400));
+    await new Promise(res=>setTimeout(res,300)); // rate limit delay
   }
 
-  // Doctor Bot block check for multi-coin monitor
-  if(S.consecLoss>=5&&!S.drOverride){
-    log('🩺 Doctor Bot: Auto trading PAUSED ('+S.consecLoss+' consecutive losses). Click 🩺 Doctor to review.','var(--red)');
-    _mcMonRunning=false;return;
-  }
-  // Raise multi-coin threshold: score>=40 AND grade A/A+
-  if(best){best=(Math.abs(best.a.score)>=40&&(best.a.grade==='A+'||best.a.grade==='A'))?best:null;}
+  // Sort by absolute score descending — trade top signals
+  candidates.sort((a,b)=>b.absScore-a.absScore);
 
-  if(best&&S.auto&&S.open.length<3&&!S.open.find(t=>t.sym===best.sym)){
-    log('🤖 AUTO TRADING: '+(best.a.isBuy?'BUY':'SELL')+' '+best.sym+' | Score:'+best.a.score.toFixed(0)+' | Conf:'+best.a.conf.toFixed(0)+'%',best.a.isBuy?'var(--green)':'var(--red)');
-    execTrade(best.a,true,best.sym);
-    playAlert(best.a.isBuy?'buy':'sell');
-    // Switch chart to the traded coin
-    document.getElementById('symSel').value=best.sym;
-    S.sym=best.sym;S.offset=0;
+  let traded=0;
+  let lastTraded=null;
+  for(let c of candidates){
+    if(S.open.length>=5)break;
+    if(S.open.find(t=>t.sym===c.sym))continue;
+    // Reset lastTradeT so multiple coins can trade in same scan
+    S.lastTradeT=0;
+    log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'%',c.a.isBuy?'var(--green)':'var(--red)');
+    execTrade(c.a,true,c.sym);
+    playAlert(c.a.isBuy?'buy':'sell');
+    traded++;
+    lastTraded=c.sym;
+    await new Promise(res=>setTimeout(res,200));
+  }
+
+  if(traded>0&&lastTraded){
+    // Switch chart to last traded coin
+    document.getElementById('symSel').value=lastTraded;
+    S.sym=lastTraded;S.offset=0;
     if(S.ws){try{S.ws.close();}catch(e){}}
     loadSymbol();
-  }else if(!best){
-    log('🔭 Multi-scan done — no strong signal found across all 20 coins','var(--gold)');
+  } else if(candidates.length===0){
+    log('🔭 Scan done — no qualifying signals on any of 20 coins','var(--gold)');
   }
 
   _mcMonRunning=false;
