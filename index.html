@@ -450,12 +450,12 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
     </div>
 
-    <div id="debugSec" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.15)">
+    <div id="debugSec" style="border-bottom:2px solid rgba(0,232,255,.25);background:rgba(0,12,30,.4);border-top:1px solid rgba(0,232,255,.15)">
       <div onclick="toggleDebug()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:6px 12px;user-select:none">
         <span style="font-size:9px;color:var(--gold);font-weight:900;letter-spacing:1.5px">&#128302; LIVE DEBUG</span>
-        <span id="debugToggle" style="font-size:8px;color:rgba(150,160,190,.4)">&#9660; OPEN</span>
+        <span id="debugToggle" style="font-size:8px;color:rgba(150,160,190,.4)">&#9650; CLOSE</span>
       </div>
-      <div id="debugContent" style="font-family:Courier New,monospace;display:none;padding:0 10px 8px">
+      <div id="debugContent" style="font-family:Courier New,monospace;display:block;padding:0 10px 8px">
         <div style="color:var(--text2);font-size:9px;text-align:center;padding:6px 0">Waiting for AI signal...</div>
       </div>
     </div>
@@ -1444,7 +1444,7 @@ function analyze(candles,curPrice){
 }
 
 // ==================== LIVE DEBUG PANEL ====================
-var _debugOpen = false;
+var _debugOpen = true;
 function toggleDebug(){
   _debugOpen=!_debugOpen;
   var c=document.getElementById('debugContent');
