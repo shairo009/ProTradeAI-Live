@@ -1870,7 +1870,6 @@ function doAI(){
   var gCol=a.grade==='A+'?'#00f07a':a.grade==='A'?'#69f0ae':a.grade==='B'?'#00e8ff':a.grade==='C'?'#ffc832':'#555';
   var gbadge='<span style="font-size:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:3px;padding:1px 5px;color:'+gCol+';margin-left:5px">'+a.grade+'</span>';
 
-  // ── DOCTOR BOT: consecutive loss check ────────────────────────────
   
   // ── MTF PRE-CHECK before firing any trade ─────────────────────────
   var _mth=S.mtfData[S.sym+'_1h'],_mt4=S.mtfData[S.sym+'_4h'];
@@ -2836,7 +2835,6 @@ function switchV(v){
 }
 
 
-// ==================== DOCTOR BOT ====================
 function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;S.equityHistory=[];localStorage.removeItem('protradeai_v4_state');log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
 function log(msg,col){
   let l=document.getElementById('aiLog'),d=document.createElement('div');
