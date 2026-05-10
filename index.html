@@ -322,7 +322,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.4</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.5</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -341,6 +341,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
     <button class="hbtn" onclick="openAIChat()" id="aichatBtn" style="background:linear-gradient(135deg,rgba(61,142,255,.2),rgba(191,95,255,.2));border-color:rgba(61,142,255,.5);color:var(--cyan);font-weight:900">🤖 AI Chat</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
+    <button class="hbtn" id="rotateBtn" onclick="toggleAutoRotate()" style="background:rgba(61,142,255,.12);border-color:rgba(61,142,255,.4);color:var(--blue);font-weight:900" title="Auto-rotate through trending coins every 20s">🔄 AUTO</button>
     <span class="api-badge no-key hdr-secondary" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
     <button class="hbtn hdr-secondary" id="sndBtn" onclick="toggleSound()">🔊 Snd ON</button>
     <button class="hbtn hdr-secondary" id="trailBtn" onclick="toggleTrail()">🔓 Trail OFF</button>
@@ -477,6 +478,16 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
     </div>
 
+    <div id="rotateBar" style="display:none;background:rgba(61,142,255,.08);border-bottom:1px solid rgba(61,142,255,.2);padding:4px 12px;display:none;align-items:center;gap:10px;height:28px;flex-shrink:0">
+      <span style="font-size:8px;color:var(--blue);font-weight:900;letter-spacing:1px">🔄 AUTO ROTATE</span>
+      <span id="rotateSymLabel" style="font-size:10px;font-weight:900;color:var(--gold)">—</span>
+      <span style="font-size:8px;color:var(--text2)" id="rotateIdxLabel">1/20</span>
+      <div style="flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+        <div id="rotateProgress" style="height:100%;width:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));border-radius:2px;transition:width 1s linear"></div>
+      </div>
+      <span id="rotateCdLabel" style="font-size:10px;font-weight:900;color:var(--cyan);min-width:28px;text-align:right">20s</span>
+      <button onclick="stopAutoRotate()" style="padding:1px 8px;border-radius:4px;border:1px solid rgba(255,45,85,.3);background:rgba(255,45,85,.1);color:#ff5252;cursor:pointer;font-size:9px;font-weight:900">■ STOP</button>
+    </div>
     <div class="chart-wrap" id="cWrap">
       <canvas id="mc"></canvas>
       <!-- Signal Box (like screenshot) -->
@@ -677,7 +688,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.4 | 7-Check Confluence + MTF Filter | 20-Coin Parallel Monitor</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.5 | 7-Check Confluence + MTF | 20-Coin Trending Auto-Rotate</span>
 </div>
 
 </div>
@@ -2668,7 +2679,135 @@ function genReport(){
 function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classList.toggle('on',S.auto);log(S.auto?'🤖 Auto trade ENABLED':'⏸ Auto trade PAUSED','var(--gold)');}
 function manualTrade(){if(!S.lastA)return;if(Math.abs(S.lastA.score)>10)execTrade(S.lastA,false);else log('⚠ Signal too weak for manual trade','var(--gold)');}
 function manClose(id){let t=S.open.find(t=>t.id===id);if(t)closeTrade(t,S.curPrice||t.entry,'Manual Close');}
-function changeSym(){let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
+function changeSym(){stopAutoRotate();let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
+// ==================== 🔄 AUTO ROTATE — Trending Coin Carousel ====================
+var AR = {
+  active: false,
+  coins: [],          // current rotate list (trending + popular)
+  idx: 0,             // current position
+  countdown: 20,      // seconds per coin
+  _cdTimer: null,     // countdown interval
+  _coinsLoaded: false
+};
+
+var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
+var AR_INTERVAL = 20; // seconds per coin
+
+async function fetchTrendingCoins(){
+  // Fetch top 20 USDT pairs by 24h quote volume from Binance
+  try{
+    var ctrl=new AbortController();
+    var to=setTimeout(function(){ctrl.abort();},8000);
+    var r=await fetch('https://api.binance.com/api/v3/ticker/24hr',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(!r.ok)throw new Error('ticker fail');
+    var data=await r.json();
+    // Filter USDT spot pairs, sort by quoteVolume descending
+    var usdt=data
+      .filter(function(d){return d.symbol.endsWith('USDT')&&parseFloat(d.quoteVolume)>0;})
+      .sort(function(a,b){return parseFloat(b.quoteVolume)-parseFloat(a.quoteVolume)})
+      .slice(0,30)
+      .map(function(d){return d.symbol;});
+
+    // Merge: always keep AR_FIXED coins, add trending ones up to 20 total
+    var merged=AR_FIXED.slice();
+    for(var i=0;i<usdt.length&&merged.length<20;i++){
+      if(merged.indexOf(usdt[i])===-1) merged.push(usdt[i]);
+    }
+    AR.coins=merged;
+    AR._coinsLoaded=true;
+    log('🔄 Auto-rotate list updated: '+merged.map(function(s){return s.replace('USDT','');}).join(', '),'var(--blue)');
+  }catch(e){
+    // Fallback to SYMS list
+    AR.coins=SYMS.slice();
+    AR._coinsLoaded=true;
+    log('🔄 Auto-rotate using default list (Binance ticker unavailable)','var(--gold)');
+  }
+}
+
+function _arUpdateUI(){
+  var bar=document.getElementById('rotateBar');
+  var symLbl=document.getElementById('rotateSymLabel');
+  var idxLbl=document.getElementById('rotateIdxLabel');
+  var cdLbl=document.getElementById('rotateCdLabel');
+  var prog=document.getElementById('rotateProgress');
+  var btn=document.getElementById('rotateBtn');
+  if(!bar)return;
+  if(AR.active){
+    bar.style.display='flex';
+    if(btn){btn.style.background='rgba(61,142,255,.25)';btn.style.borderColor='rgba(61,142,255,.7)';btn.style.color='var(--cyan)';btn.textContent='🔄 ON';}
+    if(symLbl) symLbl.textContent=(AR.coins[AR.idx]||'').replace('USDT','')+'/USDT';
+    if(idxLbl) idxLbl.textContent=(AR.idx+1)+'/'+AR.coins.length;
+    if(cdLbl) cdLbl.textContent=AR.countdown+'s';
+    if(prog){
+      var pct=Math.round((AR.countdown/AR_INTERVAL)*100);
+      prog.style.width=pct+'%';
+      prog.style.background=AR.countdown<=5?'linear-gradient(90deg,#ff5252,#ff2d55)':AR.countdown<=10?'linear-gradient(90deg,#ffc832,var(--gold))':'linear-gradient(90deg,var(--blue),var(--cyan))';
+    }
+  }else{
+    bar.style.display='none';
+    if(btn){btn.style.background='rgba(61,142,255,.12)';btn.style.borderColor='rgba(61,142,255,.4)';btn.style.color='var(--blue)';btn.textContent='🔄 AUTO';}
+  }
+}
+
+async function _arSwitchTo(idx){
+  if(!AR.coins.length)return;
+  AR.idx=((idx%AR.coins.length)+AR.coins.length)%AR.coins.length;
+  var sym=AR.coins[AR.idx];
+  S.sym=sym;S.offset=0;
+  // Update select dropdown
+  var sel=document.getElementById('symSel');
+  if(sel){
+    var found=false;
+    for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===sym){sel.selectedIndex=i;found=true;break;}}
+    if(!found){var opt=document.createElement('option');opt.value=sym;opt.textContent=sym;sel.add(opt);sel.value=sym;}
+  }
+  // Update scanner active item
+  document.querySelectorAll('.scan-item').forEach(function(el){
+    el.classList.toggle('active',el.dataset.sym===sym);
+  });
+  // Close WS, load new symbol
+  if(S.ws){try{S.ws.close();}catch(e){}}
+  log('🔄 Auto-rotate → '+sym.replace('USDT','')+'/USDT ('+(AR.idx+1)+'/'+AR.coins.length+')','var(--blue)');
+  loadSymbol();
+  AR.countdown=AR_INTERVAL;
+  _arUpdateUI();
+}
+
+async function startAutoRotate(){
+  if(AR.active)return;
+  AR.active=true;
+  AR.idx=0;
+  AR.countdown=AR_INTERVAL;
+  log('🔄 Auto-rotate STARTED — fetching trending coins...','var(--cyan)');
+  await fetchTrendingCoins();
+  _arSwitchTo(0);
+  _arUpdateUI();
+  // Countdown ticker every 1s
+  AR._cdTimer=setInterval(function(){
+    if(!AR.active)return;
+    AR.countdown--;
+    _arUpdateUI();
+    if(AR.countdown<=0){
+      AR.countdown=AR_INTERVAL;
+      _arSwitchTo(AR.idx+1);
+    }
+  },1000);
+}
+
+function stopAutoRotate(){
+  if(!AR.active&&!AR._cdTimer)return;
+  AR.active=false;
+  if(AR._cdTimer){clearInterval(AR._cdTimer);AR._cdTimer=null;}
+  AR.countdown=AR_INTERVAL;
+  _arUpdateUI();
+  log('🔄 Auto-rotate STOPPED','var(--gold)');
+}
+
+function toggleAutoRotate(){
+  if(AR.active)stopAutoRotate();
+  else startAutoRotate();
+}
 function setTF(tf){S.tf=tf;S.offset=0;document.querySelectorAll('.tf').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tf').forEach(b=>{if(b.textContent.toLowerCase()===tf)b.classList.add('active');});document.getElementById('sbTF').textContent=tf;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
 function switchV(v){
   document.getElementById('chartView').style.display=v==='chart'?'flex':'none';
@@ -2915,7 +3054,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.4 — 20-Coin Parallel Monitor active (3-phase scan)','var(--gold)');
+log('🚀 ProTrade AI v4.5 — Trending Auto-Rotate + Parallel Monitor active','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
