@@ -496,6 +496,12 @@ tr:hover td{background:rgba(61,142,255,.04)}
     </div>
 
     <div class="rp-sec">
+      <h4 style="display:flex;justify-content:space-between;align-items:center"><span>🧠 AI MEMORY</span><span style="font-size:8px;color:var(--cyan);font-weight:400;letter-spacing:.5px">SELF-LEARNING</span></h4>
+      <div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:6px">Each indicator's weight adapts based on WIN/LOSS history. Higher weight = more reliable.</div>
+      <div id="aiMemPanel"><div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:8px">⟳ Waiting for first trade...</div></div>
+    </div>
+
+    <div class="rp-sec">
       <h4>📊 SESSION STATS</h4>
       <div class="stats-grid">
         <div class="sc"><div class="scl">TOTAL TRADES</div><div class="scv" id="stTotal" style="color:var(--cyan)">0</div></div>
@@ -1274,6 +1280,96 @@ function calcInds(){
 }
 
 // ==================== SMART AI ENGINE v4 — 7-Check Confluence ====================
+
+// ==================== AI ADAPTIVE MEMORY ====================
+var AIMemory = (function(){
+  var KEYS = ['rsi','macd','ma','stoch','bb','st','pattern'];
+  var LS_KEY = 'ptai_memory_v2';
+  var data = {weights:{},stats:{},totalTrades:0};
+
+  function _def(){
+    var d={weights:{},stats:{},totalTrades:0};
+    KEYS.forEach(function(k){d.weights[k]=1.0;d.stats[k]={w:0,l:0};});
+    return d;
+  }
+
+  function load(){
+    try{var raw=localStorage.getItem(LS_KEY);if(raw){data=JSON.parse(raw);KEYS.forEach(function(k){if(!data.weights[k])data.weights[k]=1.0;if(!data.stats[k])data.stats[k]={w:0,l:0};});}}
+    catch(e){data=_def();}
+  }
+
+  function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}
+
+  function learn(trade){
+    if(!trade||!trade.checks||!trade.status)return;
+    var isWin=trade.status==='WIN';
+    var tradeDir=trade.dir==='BUY'?1:-1;
+    data.totalTrades++;
+    KEYS.forEach(function(k){
+      var ck=trade.checks[k];
+      if(!ck||ck.v===0)return;
+      var agreed=(ck.v===tradeDir);
+      if(isWin&&agreed){
+        data.weights[k]=Math.min(1.6,data.weights[k]*1.07);
+        data.stats[k].w++;
+      }else if(!isWin&&agreed){
+        data.weights[k]=Math.max(0.25,data.weights[k]*0.88);
+        data.stats[k].l++;
+      }else if(isWin&&!agreed){
+        data.weights[k]=Math.min(1.6,data.weights[k]*1.02);
+      }else if(!isWin&&!agreed){
+        data.weights[k]=Math.min(1.6,data.weights[k]*1.03);
+        data.stats[k].w++;
+      }
+    });
+    // Slow regression to 1.0 to prevent runaway weights
+    KEYS.forEach(function(k){data.weights[k]+=(1.0-data.weights[k])*0.015;});
+    save();
+    renderMemoryPanel();
+  }
+
+  function getWeights(){return data.weights;}
+  function getStats(){return data.stats;}
+  function getTotalTrades(){return data.totalTrades;}
+
+  function reset(){data=_def();save();renderMemoryPanel();}
+
+  load();
+  return{learn:learn,getWeights:getWeights,getStats:getStats,getTotalTrades:getTotalTrades,reset:reset};
+})();
+
+function renderMemoryPanel(){
+  var el=document.getElementById('aiMemPanel');
+  if(!el)return;
+  var w=AIMemory.getWeights(),st=AIMemory.getStats(),tot=AIMemory.getTotalTrades();
+  var LABELS={rsi:'RSI(14)',macd:'MACD',ma:'MA Trend',stoch:'Stoch',bb:'Bollinger',st:'Supertrend',pattern:'Pattern'};
+  var keys=['rsi','macd','ma','stoch','bb','st','pattern'];
+  var rows=keys.map(function(k){
+    var wt=w[k]||1.0;
+    var s=st[k]||{w:0,l:0};
+    var tot2=s.w+s.l;
+    var acc=tot2>0?Math.round(s.w/tot2*100):null;
+    var col=wt>=1.2?'var(--green)':wt<=0.6?'var(--red)':wt<=0.85?'#ffa726':'var(--cyan)';
+    var barW=Math.round(Math.min(100,Math.max(5,(wt/1.6)*100)));
+    var accStr=acc!==null?acc+'%':'--';
+    var accCol=acc===null?'rgba(150,160,190,.4)':acc>=55?'var(--green)':acc>=40?'var(--gold)':'var(--red)';
+    return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">'
+      +'<span style="width:62px;font-size:8px;color:rgba(160,170,200,.7);flex-shrink:0">'+LABELS[k]+'</span>'
+      +'<div style="flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">'
+      +'<div style="height:100%;width:'+barW+'%;background:'+col+';border-radius:3px;transition:width .4s"></div></div>'
+      +'<span style="width:32px;text-align:right;font-size:8px;font-weight:900;color:'+col+'">'+wt.toFixed(2)+'x</span>'
+      +'<span style="width:26px;text-align:right;font-size:8px;color:'+accCol+'">'+accStr+'</span>'
+      +'</div>';
+  }).join('');
+  var learned=tot>0?'<span style="color:var(--green)">'+tot+' trades learned</span>':'<span style="color:rgba(150,160,190,.4)">Learning from first trades...</span>';
+  el.innerHTML='<div style="margin-bottom:5px;font-size:8px;color:rgba(150,160,190,.5)">Weight &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Mult &nbsp; Acc</div>'
+    +rows
+    +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="font-size:8px">'+learned+'</span>'
+    +'<button onclick="AIMemory.reset()" style="font-size:7px;padding:2px 6px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:#ff5252;border-radius:3px;cursor:pointer">RESET</button>'
+    +'</div>';
+}
+
 function analyze(candles,curPrice){
   if(!candles||candles.length<30)return null;
   var n=candles.length-1;
@@ -1372,7 +1468,10 @@ function analyze(candles,curPrice){
   else if(bBear>0){var brp=bearPats.find(function(p){return p.w===bBear;});checks.pattern={v:-1,lbl:brp.n,sc:-Math.min(bBear,22)};}
   else checks.pattern={v:0,lbl:'No pattern',sc:0};
 
-  // Count confluence
+  // Count confluence — apply AI learned weights to indicator scores
+  var _memW=AIMemory.getWeights();
+  var ckKeys=['rsi','macd','ma','stoch','bb','st','pattern'];
+  ckKeys.forEach(function(k){if(checks[k])checks[k].sc=Math.round(checks[k].sc*(_memW[k]||1.0));});
   var ckVals=Object.values(checks);
   var bullCount=ckVals.filter(function(c){return c.v===1;}).length;
   var bearCount=ckVals.filter(function(c){return c.v===-1;}).length;
@@ -1954,6 +2053,7 @@ function closeTrade(t,closeP,reason){
   S.open=S.open.filter(x=>x.id!==t.id);
   log(`${pnl>=0?'✅':'❌'} CLOSED ${t.sym} ${t.dir} | ${pnl>=0?'+':''}$${pnl.toFixed(2)} | ${reason}`,pnl>=0?'var(--green)':'var(--red)');
   saveState();
+  AIMemory.learn(t);
 }
 
 function monitorTrades(){
