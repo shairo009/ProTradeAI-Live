@@ -301,9 +301,12 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <div class="modal-backdrop" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
     <div class="modal-title">⚙ API Settings</div>
-    <div class="modal-sub">Configure your CoinGecko API key for real-time live data in India</div>
+    <div class="modal-sub">Configure API keys for live data & AI Intelligence Bot</div>
     <label class="modal-label">CoinGecko API Key (Free — 30 calls/min)</label>
     <input class="modal-input" id="geckoKeyInput" type="password" placeholder="CG-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <label class="modal-label" style="margin-top:10px">🤖 NVIDIA NIM API Key (for Intelligence Bot — GLM 4.7)</label>
+    <input class="modal-input" id="nvidiaKeyInput" type="password" placeholder="nvapi-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get free key at <a href="https://build.nvidia.com" target="_blank" style="color:var(--cyan)">build.nvidia.com</a> — needed for AI news analysis</div>
     <div id="modalStatus" class="modal-status"></div>
     <div class="modal-info">
       🌐 Get a FREE key at <a href="https://www.coingecko.com/en/api" target="_blank">coingecko.com/en/api</a><br>
@@ -501,6 +504,24 @@ tr:hover td{background:rgba(61,142,255,.04)}
       <div id="aiMemPanel"><div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:8px">⟳ Waiting for first trade...</div></div>
     </div>
 
+    <div class="rp-sec" id="intelBotSec">
+      <h4 style="display:flex;justify-content:space-between;align-items:center">
+        <span>🕵️ INTEL BOT</span>
+        <span id="intelStatus" style="font-size:8px;padding:2px 7px;border-radius:10px;background:rgba(255,200,50,.1);color:var(--gold);border:1px solid rgba(255,200,50,.3)">OFFLINE</span>
+      </h4>
+      <div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:6px">Real-time news · Whale alerts · Reddit · AI sentiment via GLM 4.7</div>
+      <div id="intelSentBar" style="display:flex;gap:4px;margin-bottom:6px;display:none">
+        <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBullPct" style="background:rgba(0,240,122,.1);color:var(--green)">--% BULL</div>
+        <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBearPct" style="background:rgba(255,45,85,.1);color:var(--red)">--% BEAR</div>
+        <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelNeutPct" style="background:rgba(150,160,190,.06);color:var(--text2)">--% NEU</div>
+      </div>
+      <div id="intelAiVerdict" style="display:none;padding:6px 8px;border-radius:5px;font-size:9px;line-height:1.5;margin-bottom:6px"></div>
+      <div id="intelFeed" style="max-height:220px;overflow-y:auto">
+        <div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:10px">Add NVIDIA key in Settings (⚙) to activate Intel Bot</div>
+      </div>
+      <button onclick="IntelBot.refresh()" style="margin-top:6px;width:100%;font-size:9px;padding:4px 0;background:rgba(0,232,255,.08);border:1px solid rgba(0,232,255,.2);color:var(--cyan);border-radius:4px;cursor:pointer">⟳ Refresh Intel</button>
+    </div>
+
     <div class="rp-sec">
       <h4>📊 SESSION STATS</h4>
       <div class="stats-grid">
@@ -641,6 +662,7 @@ function openSettings(){
   const inp=document.getElementById('geckoKeyInput');
   const st=document.getElementById('modalStatus');
   inp.value=getGeckoKey();
+  var nki=document.getElementById('nvidiaKeyInput');if(nki)nki.value=localStorage.getItem('ptai_nvidia_key')||'';
   st.className='modal-status';
   st.textContent='';
   m.classList.add('open');
@@ -676,10 +698,11 @@ async function saveGeckoKey(){
     clearTimeout(to);
     if(r.ok||(r.status===429)){
       localStorage.setItem(GECKO_KEY_LS,key);
+      var nk=document.getElementById('nvidiaKeyInput');if(nk&&nk.value.trim())localStorage.setItem('ptai_nvidia_key',nk.value.trim());
       st.className='modal-status ok';
-      st.textContent='✅ Key saved! CoinGecko will use this for all price & chart requests.';
+      st.textContent='✅ Keys saved! CoinGecko + NVIDIA AI configured.';
       updateApiBadge();
-      // Reload chart data using new key
+      IntelBot.start();
       setTimeout(()=>{closeSettings();loadSym();},1200);
     } else {
       const body=await r.json().catch(()=>({}));
@@ -689,9 +712,11 @@ async function saveGeckoKey(){
   }catch(e){
     // Network error — save anyway (could just be CORS on ping)
     localStorage.setItem(GECKO_KEY_LS,key);
+    var nk2=document.getElementById('nvidiaKeyInput');if(nk2&&nk2.value.trim())localStorage.setItem('ptai_nvidia_key',nk2.value.trim());
     st.className='modal-status ok';
-    st.textContent='✅ Key saved! (Could not verify online — will use on next request.)';
+    st.textContent='✅ Keys saved! (Could not verify CoinGecko — will use on next request.)';
     updateApiBadge();
+    IntelBot.start();
     setTimeout(()=>{closeSettings();loadSym();},1400);
   }
 }
@@ -3127,6 +3152,220 @@ async function runBotCheck(){
   botInfo("COMPLETE","Scan finished in "+(Date.now()-BOT.startTime)+"ms");
   botRender();
 }
+
+
+
+// ==================== 🕵️ INTEL BOT — Market Intelligence ====================
+var IntelBot = (function(){
+  var _timer = null;
+  var _running = false;
+  var _lastFetch = 0;
+  var INTERVAL = 5 * 60 * 1000; // 5 minutes
+  var NVIDIA_EP = 'https://integrate.api.nvidia.com/v1/chat/completions';
+  var NVIDIA_MODEL = 'thudm/glm-4-9b-chat';
+
+  function getNvidiaKey(){ return localStorage.getItem('ptai_nvidia_key')||''; }
+
+  function setStatus(label, color){
+    var el = document.getElementById('intelStatus');
+    if(!el) return;
+    el.textContent = label;
+    el.style.background = color==='green'?'rgba(0,240,122,.12)':color==='red'?'rgba(255,45,85,.1)':'rgba(255,200,50,.1)';
+    el.style.color = color==='green'?'var(--green)':color==='red'?'var(--red)':'var(--gold)';
+    el.style.borderColor = color==='green'?'rgba(0,240,122,.35)':color==='red'?'rgba(255,45,85,.3)':'rgba(255,200,50,.3)';
+  }
+
+  function addFeedItem(icon, title, body, color, time){
+    var feed = document.getElementById('intelFeed');
+    if(!feed) return;
+    var placeholder = feed.querySelector('div[style*="rgba(150,160,190"]');
+    if(placeholder) placeholder.remove();
+    var d = document.createElement('div');
+    d.style.cssText = 'border-left:2px solid '+color+';padding:4px 6px 4px 8px;margin-bottom:5px;background:rgba(255,255,255,.02);border-radius:0 4px 4px 0';
+    d.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="font-size:9px;font-weight:900;color:'+color+'">'+icon+' '+title+'</span><span style="font-size:7px;color:rgba(150,160,190,.4);flex-shrink:0;margin-left:4px">'+time+'</span></div>'
+      +'<div style="font-size:8px;color:rgba(200,210,230,.7);margin-top:2px;line-height:1.4">'+body+'</div>';
+    feed.insertBefore(d, feed.firstChild);
+    // Keep max 20 items
+    while(feed.children.length > 20) feed.removeChild(feed.lastChild);
+  }
+
+  function clearFeed(){
+    var feed = document.getElementById('intelFeed');
+    if(feed) feed.innerHTML = '';
+  }
+
+  async function fetchNews(){
+    // CryptoCompare news — free, no key needed
+    try{
+      var ctrl = new AbortController();
+      var to = setTimeout(()=>ctrl.abort(), 6000);
+      var r = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=15&sortOrder=latest', {signal:ctrl.signal, mode:'cors'});
+      clearTimeout(to);
+      if(r.ok){
+        var d = await r.json();
+        var items = (d.Data||[]).slice(0,12).map(function(n){
+          return {title:n.title, body:(n.body||'').substring(0,200), source:n.source_info&&n.source_info.name||n.source, url:n.url, time:new Date(n.published_on*1000).toLocaleTimeString()};
+        });
+        return items;
+      }
+    }catch(e){}
+    return [];
+  }
+
+  async function fetchReddit(){
+    var subs = ['CryptoCurrency','Bitcoin','ethtrader','altcoin'];
+    var posts = [];
+    for(var i=0;i<subs.length;i++){
+      try{
+        var ctrl = new AbortController();
+        var to = setTimeout(()=>ctrl.abort(), 4000);
+        var r = await fetch('https://www.reddit.com/r/'+subs[i]+'/hot.json?limit=5', {signal:ctrl.signal, headers:{'User-Agent':'ProTradeAI/1.0'}});
+        clearTimeout(to);
+        if(r.ok){
+          var d = await r.json();
+          var ch = (d.data&&d.data.children)||[];
+          ch.forEach(function(p){ if(p.data)posts.push({title:p.data.title, score:p.data.score, sub:subs[i], ups:p.data.ups}); });
+        }
+      }catch(e){}
+    }
+    return posts.sort(function(a,b){return b.score-a.score;}).slice(0,8);
+  }
+
+  async function analyzeWithGLM(news, reddit){
+    var key = getNvidiaKey();
+    if(!key){ return null; }
+    var newsText = news.slice(0,8).map(function(n,i){return (i+1)+'. '+n.title;}).join('
+');
+    var redditText = reddit.slice(0,5).map(function(p,i){return (i+1)+'. ['+p.sub+'] '+p.title+' ('+p.score+' upvotes)';}).join('
+');
+    var prompt = 'You are a crypto trading intelligence analyst. Analyze these real-time news and social posts and respond in EXACTLY this JSON format:
+{"sentiment":"bullish|bearish|neutral","bull_pct":0-100,"bear_pct":0-100,"neutral_pct":0-100,"verdict":"1-2 sentence market outlook","key_events":["event1","event2","event3"],"trade_bias":"BUY|SELL|WAIT"}
+
+NEWS:
+'+newsText+'
+
+REDDIT TRENDING:
+'+redditText+'
+
+Respond ONLY with valid JSON, no extra text.';
+    try{
+      var ctrl = new AbortController();
+      var to = setTimeout(()=>ctrl.abort(), 20000);
+      var resp = await fetch(NVIDIA_EP, {
+        method:'POST', signal:ctrl.signal,
+        headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({model:NVIDIA_MODEL, messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.3})
+      });
+      clearTimeout(to);
+      if(resp.ok){
+        var data = await resp.json();
+        var txt = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+        var jsonMatch = txt.match(/{[sS]*}/);
+        if(jsonMatch){ try{ return JSON.parse(jsonMatch[0]); }catch(e){} }
+      } else {
+        var errText = await resp.text().catch(()=>'');
+        if(errText.includes('401')||errText.includes('unauthorized')){ setStatus('KEY ERROR','red'); }
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function renderAIVerdict(analysis){
+    var vEl = document.getElementById('intelAiVerdict');
+    var sBar = document.getElementById('intelSentBar');
+    var bPct = document.getElementById('intelBullPct');
+    var brPct = document.getElementById('intelBearPct');
+    var nPct = document.getElementById('intelNeutPct');
+    if(!vEl) return;
+    if(!analysis){ vEl.style.display='none'; if(sBar)sBar.style.display='none'; return; }
+    var sent = analysis.sentiment||'neutral';
+    var sentCol = sent==='bullish'?'var(--green)':sent==='bearish'?'var(--red)':'var(--gold)';
+    var sentIcon = sent==='bullish'?'📈':sent==='bearish'?'📉':'➡️';
+    vEl.style.display='block';
+    vEl.style.background = sent==='bullish'?'rgba(0,240,122,.06)':sent==='bearish'?'rgba(255,45,85,.06)':'rgba(255,200,50,.06)';
+    vEl.style.border = '1px solid '+(sent==='bullish'?'rgba(0,240,122,.2)':sent==='bearish'?'rgba(255,45,85,.2)':'rgba(255,200,50,.2)');
+    vEl.innerHTML = '<div style="font-weight:900;color:'+sentCol+';margin-bottom:4px">'+sentIcon+' GLM 4.7: '+(analysis.trade_bias||sent.toUpperCase())+'</div>'
+      +'<div style="color:rgba(200,210,230,.8);line-height:1.5">'+( analysis.verdict||'' )+'</div>'
+      +(analysis.key_events&&analysis.key_events.length?'<div style="margin-top:5px;font-size:8px;color:rgba(150,160,190,.7)">⚡ '+(analysis.key_events||[]).slice(0,3).join(' · ')+'</div>':'');
+    if(sBar){
+      sBar.style.display='flex';
+      if(bPct){ bPct.textContent=(analysis.bull_pct||0)+'% BULL'; bPct.style.background='rgba(0,240,122,.1)'; bPct.style.color='var(--green)'; }
+      if(brPct){ brPct.textContent=(analysis.bear_pct||0)+'% BEAR'; brPct.style.background='rgba(255,45,85,.1)'; brPct.style.color='var(--red)'; }
+      if(nPct){ nPct.textContent=(analysis.neutral_pct||0)+'% NEU'; }
+    }
+    // Store sentiment for signal boost
+    S.intelSentiment = analysis.sentiment||'neutral';
+    S.intelBias = analysis.trade_bias||'WAIT';
+  }
+
+  async function run(){
+    if(!getNvidiaKey()){ setStatus('NO KEY','gold'); return; }
+    setStatus('SCANNING...','gold');
+    _lastFetch = Date.now();
+    try{
+      // Fetch news and Reddit in parallel
+      var results = await Promise.allSettled([fetchNews(), fetchReddit()]);
+      var news = results[0].status==='fulfilled'?results[0].value:[];
+      var reddit = results[1].status==='fulfilled'?results[1].value:[];
+
+      clearFeed();
+
+      // Add whale-like large-move detection from current open positions
+      var bigMovers = Object.keys(S.mtfData||{}).filter(function(k){ return Math.abs(S.mtfData[k])>35; });
+      if(bigMovers.length>0){
+        addFeedItem('🐋','STRONG TREND DETECTED', bigMovers.slice(0,3).map(function(k){
+          var val=S.mtfData[k]; return k.replace('_','(')+'):'+(val>0?'▲BULL':'▼BEAR');
+        }).join(' · '),'var(--cyan)',new Date().toLocaleTimeString());
+      }
+
+      // Show Reddit hot posts
+      reddit.slice(0,4).forEach(function(p){
+        var title = p.title.length>80?p.title.substring(0,80)+'...':p.title;
+        var col = /crash|dump|bear|sell|down|rug|scam|fear/i.test(title)?'var(--red)':/moon|bull|pump|buy|up|rally|surge|ath/i.test(title)?'var(--green)':'rgba(150,160,190,.6)';
+        addFeedItem('🔴','r/'+p.sub, title+'<br><span style="color:rgba(150,160,190,.4)">⬆ '+p.score+' upvotes</span>', col, 'Reddit');
+      });
+
+      // Show top news
+      news.slice(0,6).forEach(function(n){
+        var title = n.title.length>90?n.title.substring(0,90)+'...':n.title;
+        var col = /crash|ban|hack|fear|bearish|dump|sell|regulation|arrest|fraud/i.test(title)?'var(--red)':/rally|bull|buy|surge|adoption|approval|record|ath|breakout/i.test(title)?'var(--green)':'rgba(150,160,190,.6)';
+        addFeedItem('📰',n.source||'News', title, col, n.time||'');
+      });
+
+      // AI Analysis
+      if(news.length>0||reddit.length>0){
+        setStatus('GLM ANALYZING...','gold');
+        var analysis = await analyzeWithGLM(news, reddit);
+        renderAIVerdict(analysis);
+        if(analysis){ setStatus('LIVE ✓','green'); }
+        else{ setStatus('LIVE (no AI)','gold'); }
+      } else {
+        setStatus('LIVE (no data)','gold');
+      }
+    }catch(e){
+      setStatus('ERROR','red');
+      addFeedItem('⚠️','Error', e.message||'Unknown error', 'var(--red)', new Date().toLocaleTimeString());
+    }
+  }
+
+  function start(){
+    if(_timer) clearInterval(_timer);
+    run();
+    _timer = setInterval(run, INTERVAL);
+    _running = true;
+  }
+
+  function stop(){
+    if(_timer) clearInterval(_timer);
+    _running = false;
+    setStatus('OFFLINE','gold');
+  }
+
+  return { start:start, stop:stop, refresh:run };
+})();
+
+// Auto-start Intel Bot if key exists
+(function(){ if(localStorage.getItem('ptai_nvidia_key')){ setTimeout(function(){IntelBot.start();},3000); } })();
 
 </script>
 </body>
