@@ -1830,13 +1830,13 @@ function analyze(candles,curPrice){
   else if(Math.abs(totalScore)>=30&&minConf>=4)grade='B';
   else if(Math.abs(totalScore)>=20&&minConf>=3)grade='C';
 
-  // TP/SL (ATR-based + S/R aware) — fixed R:R >= 2:1
+  // TP/SL (ATR-based + S/R aware) — SL=2x ATR for noise protection, R:R ≥ 2:1
   var dir=totalScore>0?1:-1;
-  var sl=pr-dir*atrV*1.5;
-  var tp1=pr+dir*atrV*2.0;
-  var tp2=totalScore>0?Math.min(pr+atrV*3.5,hi20*0.997):Math.max(pr-atrV*3.5,lo20*1.003);
-  var tp3=pr+dir*atrV*5.5;
-  var tp4=pr+dir*atrV*8.0;
+  var sl=pr-dir*atrV*2.0;   // wider SL: 2.0× ATR (was 1.5) — stops less noise-hit
+  var tp1=pr+dir*atrV*2.5;
+  var tp2=totalScore>0?Math.min(pr+atrV*4.5,hi20*0.997):Math.max(pr-atrV*4.5,lo20*1.003);
+  var tp3=pr+dir*atrV*6.5;
+  var tp4=pr+dir*atrV*9.0;
   var rr=Math.abs(tp2-pr)/Math.abs(pr-sl)||1;
 
   // Reasons list
@@ -3309,10 +3309,10 @@ async function runMultiCoinMonitor(){
   let _phase1=await Promise.allSettled(SCAN_SYMS.map(_fetchAnalyze));
   let _phase1Ok=_phase1.filter(function(r){return r.status==='fulfilled'&&r.value;}).map(function(r){return r.value;});
 
-  // Filter strong signals — grade A+/A/B, score≥32, not blocked
+  // Filter strong signals — STRICT: grade A+/A only, score≥45, not blocked
   let _preCandidates=_phase1Ok.filter(function(d){
     let a=d.a;
-    return d.absScore>=32&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B');
+    return d.absScore>=45&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A');
   });
 
   log('⚡ Phase 1 done in '+((Date.now()-_t0)/1000).toFixed(1)+'s — '+_preCandidates.length+' signal(s) pre-qualified out of '+_phase1Ok.length+' loaded','var(--cyan)');
@@ -3350,8 +3350,12 @@ async function runMultiCoinMonitor(){
     log('🎯 '+(c.a.isBuy?'BUY':'SELL')+' signal: '+c.sym+' score:'+c.a.score.toFixed(0)+' grade:'+c.a.grade+' conf:'+c.a.conf.toFixed(0)+'%'+mtfTag,c.a.isBuy?'var(--green)':'var(--red)');
   });
 
-  // Sort best score first
-  candidates.sort(function(a,b){return b.absScore-a.absScore;});
+  // Sort: MTF aligned first, then by score
+  candidates.sort(function(a,b){
+    if(a.mtfAligned&&!b.mtfAligned)return -1;
+    if(!a.mtfAligned&&b.mtfAligned)return 1;
+    return b.absScore-a.absScore;
+  });
 
   // ── PHASE 3: Execute trades (only if auto ON) ─────────────────────────────
   let traded=0, lastTraded=null;
@@ -3359,8 +3363,10 @@ async function runMultiCoinMonitor(){
     for(let c of candidates){
       if(S.open.length>=5)break;
       if(S.open.find(t=>t.sym===c.sym))continue;
+      // Require MTF alignment for auto trades — if HTF opposes, skip
+      if(!c.mtfAligned){log('⏭ SKIP '+c.sym+' — HTF not aligned (safer to wait)','var(--gold)');continue;}
       S.lastTradeT=0;
-      log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'%',c.a.isBuy?'var(--green)':'var(--red)');
+      log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'% ✔HTF',c.a.isBuy?'var(--green)':'var(--red)');
       execTrade(c.a,true,c.sym);
       playAlert(c.a.isBuy?'buy':'sell');
       traded++;
