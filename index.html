@@ -322,7 +322,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.2</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.3</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -677,7 +677,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.2 | 7-Check Confluence + HTF Filter | 20-Coin Always-On Monitor</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.3 | 7-Check Confluence + MTF Filter | 20-Coin Smart Monitor</span>
 </div>
 
 </div>
@@ -2915,7 +2915,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.2 — 20-Coin Always-On Monitor active','var(--gold)');
+log('🚀 ProTrade AI v4.3 — 20-Coin MTF-Filtered Smart Monitor active','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
@@ -3039,8 +3039,32 @@ async function runMultiCoinMonitor(){
 
       // Accept: strong signal score≥32 AND grade A+/A/B AND not blocked
       if(absScore>=32&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B')){
-        candidates.push({a,sym,pr,absScore});
-        log('🎯 '+(a.isBuy?'BUY':'SELL')+' signal: '+sym+' score:'+a.score.toFixed(0)+' grade:'+a.grade+' conf:'+a.conf.toFixed(0)+'%',a.isBuy?'var(--green)':'var(--red)');
+
+        // ── MTF CHECK: fetch 1H + 4H for this coin if not cached ──────────
+        let mth=S.mtfData[sym+'_1h'], mt4=S.mtfData[sym+'_4h'];
+        let mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
+        if(!mtfKnown){
+          try{
+            let kl1h=await tryBinanceKlines(sym,'1h',80);
+            if(kl1h&&kl1h.length){let a1h=analyze(kl1h,kl1h[kl1h.length-1].c);if(a1h){S.mtfData[sym+'_1h']=a1h.score;mth=a1h.score;}}
+            let kl4h=await tryBinanceKlines(sym,'4h',80);
+            if(kl4h&&kl4h.length){let a4h=analyze(kl4h,kl4h[kl4h.length-1].c);if(a4h){S.mtfData[sym+'_4h']=a4h.score;mt4=a4h.score;}}
+            mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
+          }catch(e){}
+        }
+
+        // Block if both 1H and 4H strongly oppose the signal
+        let mtfOpp=false;
+        if(mtfKnown){
+          if(a.isBuy&&mth<-18&&mt4<-18){mtfOpp=true;log('⛔ MTF BLOCK '+sym+' BUY — 1H▼'+mth.toFixed(0)+' 4H▼'+mt4.toFixed(0),'var(--gold)');}
+          if(a.isSell&&mth>18&&mt4>18){mtfOpp=true;log('⛔ MTF BLOCK '+sym+' SELL — 1H▲'+mth.toFixed(0)+' 4H▲'+mt4.toFixed(0),'var(--gold)');}
+        }
+        if(mtfOpp)continue;
+
+        let mtfAligned=mtfKnown&&((a.isBuy&&mth>18&&mt4>18)||(a.isSell&&mth<-18&&mt4<-18));
+        candidates.push({a,sym,pr,absScore,mtfAligned});
+        let mtfTag=mtfAligned?' ✔HTF':mtfKnown?' ⚠HTF':'';
+        log('🎯 '+(a.isBuy?'BUY':'SELL')+' signal: '+sym+' score:'+a.score.toFixed(0)+' grade:'+a.grade+' conf:'+a.conf.toFixed(0)+'%'+mtfTag,a.isBuy?'var(--green)':'var(--red)');
       }
     }catch(e){}
 
