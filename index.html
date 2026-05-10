@@ -475,18 +475,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
         <button class="tf" onclick="setTF('4h')">4H</button>
         <button class="tf" onclick="setTF('1d')">1D</button>
       </div>
-      <button id="rotateBtn" onclick="toggleAutoRotate()" style="margin-left:auto;padding:3px 10px;border-radius:5px;border:1px solid rgba(0,230,118,.5);background:rgba(0,230,118,.12);color:var(--green);cursor:pointer;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:900;letter-spacing:.5px;flex-shrink:0;transition:.15s" title="Auto-rotating every 20s — click to pause">⏸ PAUSE</button>
-    </div>
-
-    <div id="rotateBar" style="display:none;background:rgba(61,142,255,.08);border-bottom:1px solid rgba(61,142,255,.2);padding:4px 12px;display:none;align-items:center;gap:10px;height:28px;flex-shrink:0">
-      <span style="font-size:8px;color:var(--blue);font-weight:900;letter-spacing:1px">🔄 AUTO ROTATE</span>
-      <span id="rotateSymLabel" style="font-size:10px;font-weight:900;color:var(--gold)">—</span>
-      <span style="font-size:8px;color:var(--text2)" id="rotateIdxLabel">1/20</span>
-      <div style="flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
-        <div id="rotateProgress" style="height:100%;width:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));border-radius:2px;transition:width 1s linear"></div>
-      </div>
-      <span id="rotateCdLabel" style="font-size:10px;font-weight:900;color:var(--cyan);min-width:28px;text-align:right">20s</span>
-      <button onclick="stopAutoRotate()" style="padding:1px 8px;border-radius:4px;border:1px solid rgba(255,45,85,.3);background:rgba(255,45,85,.1);color:#ff5252;cursor:pointer;font-size:9px;font-weight:900">■ STOP</button>
+      <button id="rotateBtn" onclick="toggleAutoRotate()" style="margin-left:auto;padding:3px 10px;border-radius:5px;border:1px solid rgba(0,232,255,.4);background:rgba(0,232,255,.1);color:var(--cyan);cursor:pointer;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:900;letter-spacing:.5px;flex-shrink:0;transition:.15s" title="AI Signal Scan — click to pause">🤖 SCANNING</button>
     </div>
     <div class="chart-wrap" id="cWrap">
       <canvas id="mc"></canvas>
@@ -2700,15 +2689,15 @@ function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classLis
 function manualTrade(){if(!S.lastA)return;if(Math.abs(S.lastA.score)>10)execTrade(S.lastA,false);else log('⚠ Signal too weak for manual trade','var(--gold)');}
 function manClose(id){let t=S.open.find(t=>t.id===id);if(t)closeTrade(t,S.curPrice||t.entry,'Manual Close');}
 function changeSym(){stopAutoRotate();let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
-// ==================== 🔄 AUTO ROTATE — Trending Coin Carousel ====================
+// ==================== 🤖 AI SIGNAL SCAN — Scans coins, stays on signal ====================
 var AR = {
   active: false,
-  coins: [],          // current rotate list (trending + popular)
-  idx: 0,             // current position
-  countdown: 20,      // seconds per coin
-  _cdTimer: null,     // countdown interval
+  coins: [],
+  idx: 0,
+  _scanTO: null,      // current scan timeout
+  _cdTimer: null,     // kept for compatibility
   _coinsLoaded: false,
-  _signalFlashed: false  // prevent repeated extension per coin visit
+  _signalFlashed: false
 };
 
 var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
@@ -2746,131 +2735,116 @@ async function fetchTrendingCoins(){
   }
 }
 
+// ── AI scan button state ──────────────────────────────────────────────
 function _arUpdateUI(){
-  var bar=document.getElementById('rotateBar');
-  var symLbl=document.getElementById('rotateSymLabel');
-  var idxLbl=document.getElementById('rotateIdxLabel');
-  var cdLbl=document.getElementById('rotateCdLabel');
-  var prog=document.getElementById('rotateProgress');
   var btn=document.getElementById('rotateBtn');
-  if(!bar)return;
+  if(!btn)return;
   if(AR.active){
-    bar.style.display='flex';
-    if(btn){btn.style.background='rgba(0,230,118,.12)';btn.style.borderColor='rgba(0,230,118,.5)';btn.style.color='var(--green)';btn.textContent='⏸ PAUSE';btn.title='Auto-rotating every 20s — click to pause';}
-    if(symLbl) symLbl.textContent=(AR.coins[AR.idx]||'').replace('USDT','')+'/USDT';
-    if(idxLbl) idxLbl.textContent=(AR.idx+1)+'/'+AR.coins.length;
-    if(cdLbl){var m=Math.floor(AR.countdown/60),s=AR.countdown%60;cdLbl.textContent=AR.countdown>=60?m+':'+(s<10?'0':'')+s:AR.countdown+'s';}
-    if(prog){
-      var pct=Math.round((AR.countdown/AR_INTERVAL)*100);
-      prog.style.width=pct+'%';
-      prog.style.background=AR.countdown<=5?'linear-gradient(90deg,#ff5252,#ff2d55)':AR.countdown<=10?'linear-gradient(90deg,#ffc832,var(--gold))':'linear-gradient(90deg,var(--blue),var(--cyan))';
-    }
+    btn.style.border='1px solid rgba(0,232,255,.4)';
+    btn.style.background='rgba(0,232,255,.1)';
+    btn.style.color='var(--cyan)';
+    btn.title='AI Signal Scan running — click to pause';
   }else{
-    bar.style.display='none';
-    if(btn){btn.style.background='rgba(255,200,50,.1)';btn.style.borderColor='rgba(255,200,50,.4)';btn.style.color='var(--gold)';btn.textContent='▶ RESUME';btn.title='Auto-rotate paused — click to resume';}
+    btn.style.border='1px solid rgba(255,200,50,.4)';
+    btn.style.background='rgba(255,200,50,.1)';
+    btn.style.color='var(--gold)';
+    btn.textContent='▶ AI SCAN';
+    btn.title='AI Signal Scan paused — click to start';
   }
 }
 
-async function _arSwitchTo(idx){
+// ── Load a coin chart and update UI ─────────────────────────────────
+function _arSwitchTo(idx){
   if(!AR.coins.length)return;
   AR.idx=((idx%AR.coins.length)+AR.coins.length)%AR.coins.length;
   var sym=AR.coins[AR.idx];
   S.sym=sym;S.offset=0;
-  // Update select dropdown
   var sel=document.getElementById('symSel');
   if(sel){
     var found=false;
     for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===sym){sel.selectedIndex=i;found=true;break;}}
     if(!found){var opt=document.createElement('option');opt.value=sym;opt.textContent=sym;sel.add(opt);sel.value=sym;}
   }
-  // Update scanner active item
-  document.querySelectorAll('.scan-item').forEach(function(el){
-    el.classList.toggle('active',el.dataset.sym===sym);
-  });
-  // Reset signal flash state for new coin
+  document.querySelectorAll('.scan-item').forEach(function(el){el.classList.toggle('active',el.dataset.sym===sym);});
   AR._signalFlashed=false;
-  // Close WS, load new symbol
   if(S.ws){try{S.ws.close();}catch(e){}}
-  log('🔄 Auto-rotate → '+sym.replace('USDT','')+'/USDT ('+(AR.idx+1)+'/'+AR.coins.length+')','var(--blue)');
   loadSymbol();
-  AR.countdown=AR_INTERVAL;
-  _arUpdateUI();
+}
+
+// ── Core: scan one coin, decide stay or next ─────────────────────────
+// NO_SIG_WAIT : how long to analyse a coin before giving up (ms)
+// SIG_STAY    : how long to display a coin when signal is found (ms)
+var AR_NO_SIG_WAIT = 4000;   // 4 s — load chart + let AI run
+var AR_SIG_STAY    = 20000;  // 20 s — stay on coin with signal
+
+function _aiScanStep(){
+  if(!AR.active)return;
+
+  var sym=AR.coins[AR.idx%AR.coins.length];
+  var displayIdx=(AR.idx%AR.coins.length)+1;
+
+  // Update button label while scanning
+  var btn=document.getElementById('rotateBtn');
+  if(btn){btn.textContent='🔍 '+sym.replace('USDT','');}
+
+  _arSwitchTo(AR.idx%AR.coins.length);
+  log('🔍 AI scanning '+sym.replace('USDT','')+'/USDT ('+displayIdx+'/'+AR.coins.length+')','var(--text2)');
+
+  // Wait for chart data + AI analysis to complete
+  AR._scanTO=setTimeout(function(){
+    if(!AR.active)return;
+
+    var a=S.lastA;
+    var hasSignal=a&&(a.isBuy||a.isSell);
+
+    if(hasSignal){
+      // ✅ Signal found — show it for SIG_STAY ms then advance
+      var dir=a.isBuy?'BUY':'SELL';
+      var col=a.isBuy?'var(--green)':'var(--red)';
+      var icon=a.isBuy?'⬆':'⬇';
+      log('🎯 SIGNAL: '+icon+' '+dir+' on '+sym.replace('USDT','')+' (Grade:'+a.grade+' Conf:'+a.conf.toFixed(0)+'%) — showing chart for 20s',col);
+      if(btn){btn.textContent='🎯 '+sym.replace('USDT','')+' '+icon+dir;btn.style.color=col;btn.style.borderColor=a.isBuy?'rgba(0,230,118,.5)':'rgba(255,45,85,.5)';btn.style.background=a.isBuy?'rgba(0,230,118,.12)':'rgba(255,45,85,.12)';}
+      AR._scanTO=setTimeout(function(){
+        // Reset btn style and advance
+        if(btn){btn.style.color='var(--cyan)';btn.style.borderColor='rgba(0,232,255,.4)';btn.style.background='rgba(0,232,255,.1)';}
+        AR.idx++;
+        _aiScanStep();
+      },AR_SIG_STAY);
+    }else{
+      // ❌ No signal — move to next coin immediately
+      log('⏭ No signal on '+sym.replace('USDT','')+' — scanning next','var(--text2)');
+      AR.idx++;
+      AR._scanTO=setTimeout(_aiScanStep,300);
+    }
+  },AR_NO_SIG_WAIT);
 }
 
 async function startAutoRotate(){
   if(AR.active)return;
   AR.active=true;
   AR.idx=0;
-  AR.countdown=AR_INTERVAL;
-  log('🔄 Auto-rotate ' + (AR._coinsLoaded ? 'RESUMED' : 'STARTED') + ' — cycling through trending coins every 20s','var(--cyan)');
+  log('🤖 AI Signal Scan STARTED — scanning coins, stopping only on signals','var(--cyan)');
+  _arUpdateUI();
   await fetchTrendingCoins();
-  _arSwitchTo(0);
-  _arUpdateUI();
-  // Countdown ticker every 1s
-  AR._cdTimer=setInterval(function(){
-    if(!AR.active)return;
-    AR.countdown--;
-    _arUpdateUI();
-    if(AR.countdown<=0){
-      AR.countdown=AR_INTERVAL;
-      _arSwitchTo(AR.idx+1);
-    }
-  },1000);
-}
-
-// Called from doAI() when auto-rotate is active — extends stay on strong signals
-var AR_EXTEND = 0;          // no signal-based extension — always rotate every 20s
-var AR_EXTEND_MAX = 20;     // hard cap = AR_INTERVAL
-
-function arSignalFlash(a){
-  if(!AR.active||AR._signalFlashed)return;
-  var isStrong=(a.isBuy||a.isSell);
-  var isWeak=(a.isBuyWeak||a.isSellWeak);
-  if(!isStrong&&!isWeak)return;
-  AR._signalFlashed=true;
-
-  var dir=a.isBuy||a.isBuyWeak?'BUY':'SELL';
-  var col=dir==='BUY'?'var(--green)':'var(--red)';
-  var icon=dir==='BUY'?'⬆':'⬇';
-  var extra=isStrong?AR_EXTEND:Math.round(AR_EXTEND/2);
-  var newCd=Math.min(AR.countdown+extra, AR_EXTEND_MAX);
-  AR.countdown=newCd;
-
-  // Flash the rotate bar
-  var bar=document.getElementById('rotateBar');
-  var symLbl=document.getElementById('rotateSymLabel');
-  var cdLbl=document.getElementById('rotateCdLabel');
-  if(!bar)return;
-
-  // Show signal badge in bar
-  var existing=bar.querySelector('#arSigBadge');
-  if(existing)existing.remove();
-  var badge=document.createElement('span');
-  badge.id='arSigBadge';
-  badge.style.cssText='font-size:9px;font-weight:900;padding:2px 8px;border-radius:4px;animation:arFlashPulse 0.6s ease-in-out 5;border:1px solid '+(dir==='BUY'?'rgba(0,230,118,.5)':'rgba(255,45,85,.5)')+';background:'+(dir==='BUY'?'rgba(0,230,118,.15)':'rgba(255,45,85,.15)')+';color:'+col;
-  badge.textContent=icon+' '+a.grade+' '+dir+(isStrong?' ★':'');
-  bar.insertBefore(badge, cdLbl);
-
-  // Flash bar background
-  bar.style.background=dir==='BUY'?'rgba(0,230,118,.12)':'rgba(255,45,85,.12)';
-  bar.style.borderBottomColor=dir==='BUY'?'rgba(0,230,118,.3)':'rgba(255,45,85,.3)';
-  setTimeout(function(){
-    bar.style.background='rgba(61,142,255,.08)';
-    bar.style.borderBottomColor='rgba(61,142,255,.2)';
-  }, 3000);
-
-  _arUpdateUI();
-  var sym=(AR.coins[AR.idx]||'').replace('USDT','');
-  log('⚡ SIGNAL FLASH — '+icon+' '+dir+' ('+a.grade+') on '+sym+' — staying '+(extra>=60?Math.round(extra/60)+'min':extra+'s')+' longer!', col);
+  _aiScanStep();
 }
 
 function stopAutoRotate(){
-  if(!AR.active&&!AR._cdTimer)return;
   AR.active=false;
+  if(AR._scanTO){clearTimeout(AR._scanTO);AR._scanTO=null;}
   if(AR._cdTimer){clearInterval(AR._cdTimer);AR._cdTimer=null;}
-  AR.countdown=AR_INTERVAL;
   _arUpdateUI();
-  log('⏸ Auto-rotate PAUSED — click RESUME to continue','var(--gold)');
+  log('⏸ AI Signal Scan PAUSED','var(--gold)');
+}
+
+// Called from doAI() — when signal fires during scan stay-window, just log it
+function arSignalFlash(a){
+  if(!AR.active||AR._signalFlashed)return;
+  AR._signalFlashed=true;
+  var dir=a.isBuy||a.isBuyWeak?'BUY':'SELL';
+  var col=dir==='BUY'?'var(--green)':'var(--red)';
+  var sym=(AR.coins[AR.idx%AR.coins.length]||'').replace('USDT','');
+  log('⚡ SIGNAL: '+(a.isBuy?'⬆':'⬇')+' '+dir+' ('+a.grade+') confirmed on '+sym,col);
 }
 
 function toggleAutoRotate(){
