@@ -286,6 +286,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn act" onclick="switchV('chart')" id="btnC">📈 Chart</button>
     <button class="hbtn" onclick="switchV('report')" id="btnR">📊 Report</button>
     <button class="hbtn" onclick="switchV('setups')" id="btnS">🧠 Best Setups</button>
+    <button class="hbtn" onclick="switchV('botcheck')" id="btnBot">🤖 Bot Check</button>
     <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
     <span class="api-badge no-key" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
@@ -515,6 +516,11 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <!-- BEST SETUPS VIEW -->
 <div id="setupsView" style="display:none;flex:1;overflow-y:auto;padding:16px;background:var(--bg0)">
   <div id="setupsContent"></div>
+</div>
+
+<!-- BOT CHECK VIEW -->
+<div id="botcheckView" style="display:none;flex:1;overflow-y:auto;padding:16px;background:var(--bg0)">
+  <div id="botcheckContent"></div>
 </div>
 
 <!-- STATUS BAR -->
@@ -2200,6 +2206,540 @@ function genBestSetupsHtml(){
     +'<div style="font-size:10px;color:var(--text2);margin-bottom:10px;padding:0 2px">Combinations ranked by Win Rate. Min 2 trades required.</div>'
     +rows
     +'</div>';
+}
+
+
+// ==================== BOT FUNCTION CHECKER ====================
+var BOT = {running:false, results:[], startTime:0};
+
+function botPass(name,detail){
+  BOT.results.push({name,status:'PASS',detail,time:Date.now()-BOT.startTime});
+  botRender();
+}
+function botFail(name,detail){
+  BOT.results.push({name,status:'FAIL',detail,time:Date.now()-BOT.startTime});
+  botRender();
+}
+function botWarn(name,detail){
+  BOT.results.push({name,status:'WARN',detail,time:Date.now()-BOT.startTime});
+  botRender();
+}
+function botInfo(name,detail){
+  BOT.results.push({name,status:'INFO',detail,time:Date.now()-BOT.startTime});
+  botRender();
+}
+
+function botRender(){
+  var el=document.getElementById('botcheckContent');
+  if(!el)return;
+  var pass=BOT.results.filter(function(r){return r.status==='PASS';}).length;
+  var fail=BOT.results.filter(function(r){return r.status==='FAIL';}).length;
+  var warn=BOT.results.filter(function(r){return r.status==='WARN';}).length;
+  var total=BOT.results.filter(function(r){return r.status!=='INFO';}).length;
+  var pct=total?Math.round(pass/total*100):0;
+  var overallC=fail>0?'#ff2d55':warn>2?'#ffc832':'#00f07a';
+  var overallT=fail>0?'ISSUES FOUND':'SYSTEM OK';
+
+  var rows=BOT.results.map(function(r,i){
+    var ic=r.status==='PASS'?'✅':r.status==='FAIL'?'❌':r.status==='WARN'?'⚠️':'ℹ️';
+    var sc=r.status==='PASS'?'#00f07a':r.status==='FAIL'?'#ff2d55':r.status==='WARN'?'#ffc832':'#00e8ff';
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-bottom:1px solid rgba(26,38,64,.5);animation:fadeIn .3s ease both;animation-delay:'+(i*0.04)+'s">'
+      +'<span style="font-size:13px;margin-top:1px">'+ic+'</span>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--text)">'+r.name+'</div>'
+      +'<div style="font-size:10px;color:var(--text2);margin-top:2px">'+r.detail+'</div>'
+      +'</div>'
+      +'<span style="font-size:9px;color:rgba(100,120,160,.6);white-space:nowrap">+'+r.time+'ms</span>'
+      +'</div>';
+  }).join('');
+
+  var loadingDots=BOT.running?'<span style="color:var(--gold);font-size:11px;letter-spacing:2px"> ⟳ Running...</span>':'';
+
+  el.innerHTML='<div style="max-width:700px;margin:0 auto;font-family:Courier New,monospace;color:var(--text)">'
+    +'<div style="text-align:center;margin-bottom:14px;padding:16px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2)">'
+    +'<div style="font-size:18px;font-weight:900;color:var(--gold);letter-spacing:2px">🤖 FUNCTION CHECKER BOT</div>'
+    +'<div style="font-size:10px;color:var(--cyan);margin-top:4px">Automated diagnostic scan — checks all site functions'+loadingDots+'</div>'
+    +'</div>'
+    +(BOT.results.length>0?
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
+      +'<div style="background:rgba(0,240,122,.07);border:1px solid rgba(0,240,122,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;color:#00f07a;margin-bottom:4px">PASSED</div><div style="font-size:24px;font-weight:900;color:#00f07a">'+pass+'</div></div>'
+      +'<div style="background:rgba(255,45,85,.07);border:1px solid rgba(255,45,85,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;color:#ff2d55;margin-bottom:4px">FAILED</div><div style="font-size:24px;font-weight:900;color:#ff2d55">'+fail+'</div></div>'
+      +'<div style="background:rgba(255,200,50,.07);border:1px solid rgba(255,200,50,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;color:#ffc832;margin-bottom:4px">WARNINGS</div><div style="font-size:24px;font-weight:900;color:#ffc832">'+warn+'</div></div>'
+      +'<div style="background:rgba(0,232,255,.07);border:1px solid rgba(0,232,255,.2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:9px;color:var(--cyan);margin-bottom:4px">HEALTH</div><div style="font-size:24px;font-weight:900;color:'+overallC+'">'+pct+'%</div></div>'
+      +'</div>'
+      +'<div style="background:linear-gradient(135deg,rgba(10,16,25,.9),rgba(14,22,34,.95));border:2px solid '+overallC+';border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;box-shadow:0 0 20px '+overallC.replace('#','rgba(')+',0.12)">'
+      +'<div style="font-size:28px">'+(fail>0?'🔴':warn>2?'🟡':'🟢')+'</div>'
+      +'<div><div style="font-size:14px;font-weight:900;color:'+overallC+'">'+overallT+'</div>'
+      +'<div style="font-size:10px;color:var(--text2);margin-top:2px">'+pass+' checks passed, '+fail+' failed, '+warn+' warnings</div></div>'
+      +(BOT.running?'':'<button onclick="runBotCheck()" style="margin-left:auto;padding:6px 14px;background:rgba(0,232,255,.12);border:1px solid rgba(0,232,255,.3);border-radius:6px;color:var(--cyan);cursor:pointer;font-size:10px;font-family:Courier New,monospace">⟳ Run Again</button>')
+      +'</div>'
+    :'')
+    +(BOT.results.length===0?
+      '<div style="text-align:center;padding:50px 20px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">'
+      +'<div style="font-size:40px;margin-bottom:14px">🤖</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px">Ready to Scan</div>'
+      +'<div style="font-size:10px;color:var(--text2);margin-bottom:20px">Click the button below to run a full diagnostic scan of all site functions</div>'
+      +'<button onclick="runBotCheck()" style="padding:10px 28px;background:linear-gradient(135deg,var(--blue),#2563eb);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:12px;font-weight:700;font-family:Courier New,monospace;letter-spacing:1px;box-shadow:0 0 20px rgba(61,142,255,.3)">🚀 START BOT CHECK</button>'
+      +'</div>'
+    :
+      '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+      +'<div style="padding:8px 12px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border);font-size:9px;color:var(--text2);letter-spacing:1px">DIAGNOSTIC RESULTS</div>'
+      +rows
+      +'</div>'
+    )
+    +'</div>';
+}
+
+async function runBotCheck(){
+  BOT.running=true;
+  BOT.results=[];
+  BOT.startTime=Date.now();
+  botRender();
+
+  // CATEGORY 1: DOM Structure
+  botInfo('📋 DOM STRUCTURE CHECK','Checking all required HTML elements...');
+  var domChecks=[
+    ['Chart Canvas','mc'],['Chart Wrapper','cWrap'],['AI Log','aiLog'],
+    ['Report View','reportView'],['Setups View','setupsView'],
+    ['Scan List','scanList'],['Confluence Panel','confluencePanel'],
+    ['Equity Curve','eqC'],['Symbol Select','symSel'],
+    ['Balance Display','balV'],['Auto Toggle','autoTog'],
+    ['Scan Badge','scanBadge'],['F&G Value','fgVal']
+  ];
+  domChecks.forEach(function(c){
+    var el=document.getElementById(c[1]);
+    if(el)botPass('DOM: '+c[0],'Element #'+c[1]+' found ✓');
+    else botFail('DOM: '+c[0],'Element #'+c[1]+' MISSING — layout may be broken');
+  });
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 2: Core Functions
+  botInfo('⚙️ CORE FUNCTIONS','Checking all JavaScript functions...');
+  var fnChecks=[
+    ['analyze','Core indicator analysis'],
+    ['genReport','Daily report generator'],
+    ['getBestSetups','Best Setup Detector'],
+    ['genBestSetupsHtml','Best Setups HTML renderer'],
+    ['switchV','View switcher'],
+    ['renderAll','Chart renderer'],
+    ['buildScanner','Market scanner'],
+    ['execTrade','Trade execution engine'],
+    ['closeTrade','Trade closing engine'],
+    ['monitorTrades','Trade monitor'],
+    ['fetchMTFSignals','Multi-timeframe signals'],
+    ['updateConfluencePanel','Confluence panel'],
+    ['drawEquityCurve','Equity curve chart'],
+    ['fetchFearGreed','Fear & Greed fetcher'],
+    ['toggleAuto','Auto trade toggle'],
+    ['toggleSound','Sound toggle'],
+    ['playAlert','Alert sound player'],
+    ['runBotCheck','Bot checker itself'],
+    ['fmt','Number formatter'],
+    ['log','Log function'],
+    ['setTF','Timeframe setter'],
+    ['changeSym','Symbol changer'],
+    ['resetAcc','Account reset'],
+  ];
+  fnChecks.forEach(function(f){
+    if(typeof window[f[0]]==='function')botPass('FN: '+f[0],f[1]+' — function exists ✓');
+    else botFail('FN: '+f[0],f[1]+' — FUNCTION NOT FOUND ✗');
+  });
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 3: State Object
+  botInfo('💾 STATE OBJECT','Checking global state S...');
+  try{
+    if(typeof S==='undefined'){botFail('State Object S','Global state S is undefined!');return;}
+    botPass('State: S object','Global state S initialized ✓');
+    var sFields=['sym','bal','trades','open','dataReady','auto','zoom','candles'];
+    sFields.forEach(function(f){
+      if(S[f]!==undefined)botPass('State: S.'+f,'Value: '+JSON.stringify(S[f]).slice(0,40));
+      else botWarn('State: S.'+f,'Field missing in state object');
+    });
+    if(S.bal>=0)botPass('Balance Check','Current balance: ₹'+S.bal.toFixed(2));
+    else botFail('Balance Check','Balance is negative: ₹'+S.bal.toFixed(2));
+  }catch(e){botFail('State Object','Error reading state: '+e.message);}
+  await new Promise(function(r){setTimeout(r,300);});
+
+  // CATEGORY 4: Binance API
+  botInfo('📡 BINANCE API','Testing live market data connection...');
+  try{
+    var ctrl=new AbortController();
+    var to=setTimeout(function(){ctrl.abort();},8000);
+    var res=await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(res.ok){
+      var data=await res.json();
+      if(data&&data.price)botPass('Binance REST API','BTC price: 
+  let wins=S.trades.filter(t=>t.status==='WIN'),losses=S.trades.filter(t=>t.status==='LOSS');
+  let netPnl=S.trades.reduce((a,t)=>a+t.pnl,0);
+  let winPnl=wins.reduce((a,t)=>a+t.pnl,0),lossPnl=losses.reduce((a,t)=>a+Math.abs(t.pnl),0);
+  let wr=S.trades.length?Math.round(wins.length/S.trades.length*100):0;
+  let pf=lossPnl?Math.abs(winPnl/lossPnl):wins.length?99:0;
+  let avg_w=wins.length?winPnl/wins.length:0;
+  let best=S.trades.reduce((a,t)=>t.pnl>a.pnl?t:a,{pnl:-Infinity,sym:''});
+  let worst=S.trades.reduce((a,t)=>t.pnl<a.pnl?t:a,{pnl:Infinity,sym:''});
+  let pnlC=netPnl>=0?'#00e676':'#ff1744',wrC=wr>=60?'#00e676':wr>=40?'#ffd740':'#ff1744';
+  let bySym={};S.trades.forEach(t=>{if(!bySym[t.sym])bySym[t.sym]={t:0,w:0,p:0};bySym[t.sym].t++;if(t.status==='WIN')bySym[t.sym].w++;bySym[t.sym].p+=t.pnl;});
+  let bySymRows=Object.entries(bySym).sort((a,b)=>b[1].p-a[1].p).map(([s,d])=>`<tr><td style="color:#fff;font-weight:700">${s.replace('USDT','')}</td><td style="color:#00e5ff">${d.t}</td><td style="color:${d.w/d.t>=.5?'#00e676':'#ff1744'}">${Math.round(d.w/d.t*100)}%</td><td style="color:${d.p>=0?'#00e676':'#ff1744'};font-weight:700">${d.p>=0?'+':''}₹${d.p.toFixed(2)}</td></tr>`).join('');
+  let recentRows=S.trades.slice(-10).reverse().map(t=>`<tr><td style="color:var(--text2)">${t.openTime}</td><td style="color:#fff;font-weight:700">${t.sym.replace('USDT','')}</td><td style="color:${t.dir==='BUY'?'#00e676':'#ff1744'};font-weight:700">${t.dir}</td><td>${fmt(t.entry)}</td><td>${fmt(t.exit||0)}</td><td style="color:${t.pnl>=0?'#00e676':'#ff1744'};font-weight:900">${t.pnl>=0?'+':''}₹${t.pnl.toFixed(2)}</td><td style="color:var(--text2);font-size:9px">${t.reason||''}</td></tr>`).join('');
+  return`<div style="max-width:900px;margin:0 auto;font-family:'Courier New',monospace;color:var(--text)">
+  <div style="text-align:center;margin-bottom:20px;padding:18px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2)">
+    <div style="font-size:20px;font-weight:900;color:var(--gold);letter-spacing:3px">📊 PROTRADE AI — DAILY REPORT</div>
+    <div style="font-size:12px;color:var(--cyan);margin-top:5px;letter-spacing:1px">REAL BINANCE DATA • PAPER TRADING SESSION</div>
+    <div style="font-size:10px;color:var(--text2);margin-top:3px">${new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} — ${new Date().toLocaleTimeString()} IST</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    ${[['NET P&L',(netPnl>=0?'+':'')+'₹'+Math.abs(netPnl).toFixed(2),'$'+Math.abs(netPnl).toFixed(2),pnlC],['WIN RATE',wr+'%',wrC],['TOTAL TRADES',S.trades.length,'var(--cyan)'],['PROFIT FACTOR',pf.toFixed(2),pf>=1.5?'#00e676':pf>=1?'#ffd740':'#ff1744']].map(([l,v,c])=>`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:12px;text-align:center"><div style="font-size:9px;color:var(--text2);margin-bottom:5px;letter-spacing:.5px">${l}</div><div style="font-size:20px;font-weight:900;color:${c}">${v}</div></div>`).join('')}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px">
+      <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:9px;letter-spacing:1px">📊 DETAILED STATISTICS</div>
+      ${[['Starting Balance','₹'+S.startBal.toFixed(2),'var(--text)'],['Final Balance','₹'+S.bal.toFixed(2),pnlC],['Open PnL','₹'+(S.open.reduce((a,t)=>a+t.pnl,0)).toFixed(2),'var(--cyan)'],['Total Wins',wins.length,'#00e676'],['Total Losses',losses.length,'#ff1744'],['Avg Win per Trade',wins.length?'+₹'+avg_w.toFixed(2):'N/A','#00e676'],['Best Trade',best.pnl===(-Infinity)?'-':'+₹'+best.pnl.toFixed(2)+' ('+best.sym.replace('USDT','')+')', '#00e676'],['Worst Trade',worst.pnl===Infinity?'-':'₹'+worst.pnl.toFixed(2)+' ('+worst.sym.replace('USDT','')+')', '#ff1744'],['Net Return',(netPnl/S.startBal*100).toFixed(2)+'%',pnlC],['Data Source','Binance API (REAL)','var(--cyan)']].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(28,37,64,.5)"><span style="color:var(--text2);font-size:10px">${l}</span><span style="font-weight:700;font-size:10px;color:${c}">${v}</span></div>`).join('')}
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px">
+      <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:9px;letter-spacing:1px">💹 PERFORMANCE BY SYMBOL</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <tr style="color:var(--text2);font-size:9px"><th style="text-align:left;padding:3px 4px">SYMBOL</th><th>TRADES</th><th>WIN%</th><th>P&L</th></tr>
+        ${bySymRows||'<tr><td colspan="4" style="color:var(--text2);text-align:center;padding:20px;font-size:10px">No trades yet</td></tr>'}
+      </table>
+    </div>
+  </div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:8px">📋 RECENT TRADES (Last 10)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <tr style="color:var(--text2);font-size:9px;border-bottom:1px solid var(--border)"><th style="text-align:left;padding:3px 6px">TIME</th><th>SYM</th><th>DIR</th><th>ENTRY</th><th>EXIT</th><th>P&L</th><th>REASON</th></tr>
+      ${recentRows||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2);font-size:10px">🤖 AI scanning real Binance markets...</td></tr>'}
+    </table>
+  </div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px">
+    <div style="font-size:10px;color:var(--gold);font-weight:700;margin-bottom:9px;letter-spacing:1px">🤖 AI PERFORMANCE ASSESSMENT</div>
+    <div style="font-size:10px;line-height:2;color:var(--text)">
+      ${S.trades.length===0
+        ?'<span style="color:var(--text2)">No trades recorded yet. AI is actively monitoring real Binance data for signals.</span>'
+        :`Session: <span style="color:${pnlC};font-weight:700">${netPnl>=0?'PROFITABLE 🟢':'IN LOSS 🔴'}</span> | <span style="color:var(--cyan);font-weight:700">${S.trades.length} trades</span> executed on real market data<br>
+        Win Rate: <span style="color:${wrC};font-weight:700">${wr}%</span> — ${wr>=65?'Excellent! Strategy is working very well.':wr>=50?'Good. Maintain consistency.':wr>=40?'Below average. Review entry criteria.':'Needs improvement. Adjust strategy.'}<br>
+        Profit Factor: <span style="color:${pf>=1.5?'#00e676':pf>=1?'#ffd740':'#ff1744'};font-weight:700">${pf.toFixed(2)}</span> — ${pf>=2?'Excellent risk management!':pf>=1.5?'Very good':pf>=1.2?'Good':pf>=1.0?'Break-even zone':'Below 1 — risk:reward needs improvement'}<br>
+        Return: <span style="color:${pnlC};font-weight:700">${(netPnl/S.startBal*100).toFixed(2)}%</span> on ₹${S.startBal.toLocaleString('en-IN')} capital<br>
+        <span style="color:var(--text2);font-size:9px">⚠ Paper trading using real Binance live prices. No real money involved. Past performance ≠ future results.</span>`}
+    </div>
+  </div>
+  </div>`;
+}
+
+// ==================== CONTROLS ====================
+function toggleAuto(){S.auto=!S.auto;document.getElementById('autoTog').classList.toggle('on',S.auto);log(S.auto?'🤖 Auto trade ENABLED':'⏸ Auto trade PAUSED','var(--gold)');}
+function manualTrade(){if(!S.lastA)return;if(Math.abs(S.lastA.score)>10)execTrade(S.lastA,false);else log('⚠ Signal too weak for manual trade','var(--gold)');}
+function manClose(id){let t=S.open.find(t=>t.id===id);if(t)closeTrade(t,S.curPrice||t.entry,'Manual Close');}
+function changeSym(){let s=document.getElementById('symSel').value;S.sym=s;S.offset=0;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
+function setTF(tf){S.tf=tf;S.offset=0;document.querySelectorAll('.tf').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tf').forEach(b=>{if(b.textContent===tf)b.classList.add('active');});document.getElementById('sbTF').textContent=tf;if(S.ws){try{S.ws.close();}catch(e){}}loadSymbol();}
+function switchV(v){
+  document.getElementById('chartView').style.display=v==='chart'?'flex':'none';
+  document.getElementById('reportView').style.display=v==='report'?'block':'none';
+  document.getElementById('setupsView').style.display=v==='setups'?'block':'none';
+  document.getElementById('botcheckView').style.display=v==='botcheck'?'block':'none';
+  document.getElementById('btnC').classList.toggle('act',v==='chart');
+  document.getElementById('btnR').classList.toggle('act',v==='report');
+  document.getElementById('btnS').classList.toggle('act',v==='setups');
+  document.getElementById('btnBot').classList.toggle('act',v==='botcheck');
+  if(v==='report')document.getElementById('repContent').innerHTML=genReport();
+  if(v==='setups')document.getElementById('setupsContent').innerHTML=genBestSetupsHtml();
+  if(v==='botcheck'){botRender();}
+}
+function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
+function log(msg,col){
+  let l=document.getElementById('aiLog'),d=document.createElement('div');
+  d.className='li';d.innerHTML=`<span class="lt">[${new Date().toLocaleTimeString()}] </span><span style="color:${col||'var(--text)'}">${msg}</span>`;
+  l.insertBefore(d,l.firstChild);if(l.children.length>50)l.removeChild(l.lastChild);
+}
+
+// Chart events
+let mc3=document.getElementById('mc');
+mc3.addEventListener('mousedown',e=>{S.drag=true;S.dragX=e.clientX;});
+mc3.addEventListener('mouseup',()=>S.drag=false);
+mc3.addEventListener('mouseleave',()=>{S.drag=false;S.mx=-1;document.getElementById('xhTip').style.display='none';});
+mc3.addEventListener('mousemove',e=>{
+  let r=mc3.getBoundingClientRect();S.mx=e.clientX-r.left;S.my=e.clientY-r.top;
+  if(S.drag){let dx=e.clientX-S.dragX;S.dragX=e.clientX;let {tw}=getVis();S.offset=Math.max(0,Math.min(S.candles.length-30,S.offset-dx/tw));}
+  let {start,end,tw,cW,gap}=getVis();
+  let {W:cssWW}=getVis();
+  let idx=S.candles.length-1-Math.floor((cssWW-S.mx)/tw);
+  if(S.candles[idx]){
+    let cd=S.candles[idx];
+    let tip=document.getElementById('xhTip');
+    tip.style.display='block';tip.style.left=(S.mx+14)+'px';tip.style.top=Math.max(0,(S.my-50))+'px';
+    tip.innerHTML=`<b style="color:var(--gold)">${new Date(cd.t).toLocaleTimeString()}</b><br>O:<b>${fmt(cd.o)}</b> H:<b>${fmt(cd.h)}</b><br>L:<b>${fmt(cd.l)}</b> C:<b style="color:${cd.c>=cd.o?'var(--green)':'var(--red)'}">${fmt(cd.c)}</b><br>Vol:<b>${cd.v.toLocaleString('en',{maximumFractionDigits:0})}</b>`;
+  }
+  if(S.dataReady)renderAll();
+});
+mc3.addEventListener('wheel',e=>{e.preventDefault();S.zoom=Math.max(0.3,Math.min(6,S.zoom*(e.deltaY<0?1.12:0.9)));if(S.dataReady)renderAll();},{passive:false});
+window.addEventListener('resize',()=>{if(S.dataReady)renderAll();});
+
+
+// ==================== FEAR & GREED ====================
+var FG = {value:50,label:'Neutral',color:'var(--gold)',ts:0};
+
+async function fetchFearGreed(){
+  try{
+    var ctrl=new AbortController();
+    var to=setTimeout(function(){ctrl.abort();},6000);
+    var r=await fetch('https://api.alternative.me/fng/?limit=1',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(r.ok){
+      var d=await r.json();
+      if(d&&d.data&&d.data[0]){
+        var v=parseInt(d.data[0].value);
+        var lbl=d.data[0].value_classification;
+        var col=v<=25?'var(--red)':v<=45?'#ff9800':v<=55?'var(--gold)':v<=75?'#69f0ae':'var(--green)';
+        FG={value:v,label:lbl,color:col,ts:Date.now()};
+        updateFGChip();
+        log('😨 Fear & Greed: '+v+' — '+lbl,'var(--cyan)');
+      }
+    }
+  }catch(e){
+    // Use simulated value if API fails
+    var simV=42+Math.floor(Math.random()*20);
+    FG={value:simV,label:'Neutral',color:'var(--gold)',ts:Date.now()};
+    updateFGChip();
+  }
+}
+
+function updateFGChip(){
+  var el=document.getElementById('fgVal');
+  var chip=document.getElementById('fgChip');
+  if(!el)return;
+  var emoji=FG.value<=25?'😱':FG.value<=45?'😨':FG.value<=55?'😐':FG.value<=75?'😊':'🤑';
+  el.textContent=emoji+' '+FG.value;
+  el.style.color=FG.color;
+  if(chip){
+    chip.style.borderColor=FG.color;
+    chip.style.boxShadow='0 0 8px '+FG.color.replace(')',',0.15)').replace('var','rgba').replace('var(--green)','rgba(0,240,122,.15)').replace('var(--red)','rgba(255,45,85,.15)').replace('var(--gold)','rgba(255,200,50,.15)');
+    chip.title='F&G: '+FG.value+' — '+FG.label+' | Click to refresh';
+    chip.onclick=function(){log('⟳ Refreshing Fear & Greed...','var(--text2)');fetchFearGreed();};
+  }
+  // Show label below
+  var cl=chip&&chip.querySelector('.cl');
+  if(cl)cl.textContent=FG.label.toUpperCase().slice(0,10);
+  // Update right panel
+  var bv=document.getElementById('fgBigVal');
+  var bl=document.getElementById('fgBigLbl');
+  var ff=document.getElementById('fgFill');
+  if(bv){bv.textContent=FG.value;bv.style.color=FG.color;}
+  if(bl){bl.textContent=FG.label.toUpperCase();bl.style.color=FG.color;}
+  if(ff){ff.style.width=FG.value+'%';ff.style.background=FG.color;}
+  drawFGGauge();
+}
+
+function drawFGGauge(){
+  var c=document.getElementById('fgGauge');if(!c)return;
+  var ctx=c.getContext('2d'),W=c.width,H=c.height,cx=W/2,cy=H*0.62,r=28,lw=10;
+  ctx.clearRect(0,0,W,H);
+  // Background arc
+  var startA=Math.PI,endA=2*Math.PI;
+  ctx.beginPath();ctx.arc(cx,cy,r,startA,endA);ctx.strokeStyle='#1a2640';ctx.lineWidth=lw;ctx.stroke();
+  // Color segments
+  var segs=[[0,25,'#ff2d55'],[25,45,'#ff9800'],[45,55,'#ffc832'],[55,75,'#69f0ae'],[75,100,'#00f07a']];
+  segs.forEach(function(s){
+    var sa=Math.PI+s[0]/100*Math.PI,ea=Math.PI+s[1]/100*Math.PI;
+    ctx.beginPath();ctx.arc(cx,cy,r,sa,ea);ctx.strokeStyle=s[2];ctx.lineWidth=lw;ctx.globalAlpha=0.35;ctx.stroke();ctx.globalAlpha=1;
+  });
+  // Active segment
+  var activeEnd=Math.PI+FG.value/100*Math.PI;
+  ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,activeEnd);ctx.strokeStyle=FG.color;ctx.lineWidth=lw;
+  ctx.shadowColor=FG.color;ctx.shadowBlur=8;ctx.stroke();ctx.shadowBlur=0;
+  // Needle
+  var needleA=Math.PI+FG.value/100*Math.PI;
+  ctx.beginPath();ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+Math.cos(needleA)*(r-2),cy+Math.sin(needleA)*(r-2));
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();
+  // Center dot
+  ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+  // Labels
+  ctx.fillStyle='rgba(104,120,160,.7)';ctx.font='7px Courier';ctx.textAlign='center';
+  ctx.fillText('0',cx-r-2,cy+5);ctx.fillText('100',cx+r+2,cy+5);
+}
+
+// ==================== INIT ====================
+// Alias for settings modal callbacks
+function loadSym(){loadSymbol();}
+
+log('🚀 ProTrade AI v4.1 — Confluence + HTF Trend Filter online','var(--gold)');
+log('📡 Connecting to Binance WebSocket...','var(--cyan)');
+log('💰 Paper balance: ₹10,000 | Auto trade: ON','var(--green)');
+
+// Show API key badge state on load
+updateApiBadge();
+if(getGeckoKey()){
+  log('🔑 CoinGecko API key loaded from storage — enhanced rate limits active','var(--cyan)');
+}
+
+// Use requestAnimationFrame so first render happens AFTER browser layout
+// This guarantees cWrap.clientWidth/clientHeight are non-zero on first renderAll()
+requestAnimationFrame(()=>{
+  loadSymbol();
+});
+setInterval(()=>{if(S.dataReady)updateUI();},2000);
+fetchFearGreed();
+setInterval(fetchFearGreed,5*60*1000);
+
+// Safety net: force re-render 1s after load in case RAF was too early
+setTimeout(()=>{if(S.dataReady)renderAll();},1000);
+setTimeout(()=>{if(S.dataReady)renderAll();},3000);
+</script>
+</body>
+</html>
++parseFloat(data.price).toFixed(2)+' — API live ✓');
+      else botWarn('Binance REST API','Response received but price missing');
+    }else{
+      botFail('Binance REST API','HTTP '+res.status+' — API unreachable');
+    }
+  }catch(e){
+    if(e.name==='AbortError')botFail('Binance REST API','Timeout after 8s — connection failed');
+    else botWarn('Binance REST API','Error: '+e.message.slice(0,60));
+  }
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 5: Binance Klines (chart data)
+  botInfo('📊 CHART DATA','Testing kline/candlestick data...');
+  try{
+    var ctrl2=new AbortController();
+    var to2=setTimeout(function(){ctrl2.abort();},10000);
+    var kres=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=10',{signal:ctrl2.signal});
+    clearTimeout(to2);
+    if(kres.ok){
+      var kdata=await kres.json();
+      if(kdata&&kdata.length>0)botPass('Binance Klines API',kdata.length+' candles fetched — chart data working ✓');
+      else botWarn('Binance Klines API','Empty kline response');
+    }else{
+      botFail('Binance Klines API','HTTP '+kres.status);
+    }
+  }catch(e){
+    botWarn('Binance Klines API','Error: '+e.message.slice(0,60));
+  }
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 6: WebSocket
+  botInfo('🔌 WEBSOCKET','Testing Binance WebSocket connection...');
+  try{
+    await new Promise(function(resolve){
+      var ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+      var timeout=setTimeout(function(){ws.close();botWarn('WebSocket','Connection timeout after 6s');resolve();},6000);
+      ws.onopen=function(){
+        clearTimeout(timeout);
+        botPass('WebSocket','Connected to Binance stream wss://stream.binance.com ✓');
+        ws.close();resolve();
+      };
+      ws.onerror=function(e){
+        clearTimeout(timeout);
+        botFail('WebSocket','Connection failed — real-time data may not work');
+        resolve();
+      };
+    });
+  }catch(e){botFail('WebSocket','Error: '+e.message.slice(0,60));}
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 7: Fear & Greed API
+  botInfo('😨 FEAR & GREED','Testing sentiment index API...');
+  try{
+    var ctrl3=new AbortController();
+    var to3=setTimeout(function(){ctrl3.abort();},7000);
+    var fgres=await fetch('https://api.alternative.me/fng/?limit=1',{signal:ctrl3.signal});
+    clearTimeout(to3);
+    if(fgres.ok){
+      var fgdata=await fgres.json();
+      if(fgdata&&fgdata.data&&fgdata.data[0])
+        botPass('Fear & Greed API','Value: '+fgdata.data[0].value+' ('+fgdata.data[0].value_classification+') ✓');
+      else botWarn('Fear & Greed API','API responded but data format unexpected');
+    }else{
+      botWarn('Fear & Greed API','HTTP '+fgres.status+' — will use simulated value');
+    }
+  }catch(e){
+    botWarn('Fear & Greed API','Error: '+e.message.slice(0,50)+' — fallback simulation active');
+  }
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 8: Indicator Engine
+  botInfo('🧮 INDICATOR ENGINE','Testing analyze() with dummy candles...');
+  try{
+    if(typeof analyze==='function'){
+      var dummyCandles=[];
+      var base=50000;
+      for(var i=0;i<80;i++){
+        var o=base+Math.sin(i*0.3)*500+Math.random()*200;
+        var c=o+Math.random()*400-200;
+        var h=Math.max(o,c)+Math.random()*150;
+        var l=Math.min(o,c)-Math.random()*150;
+        dummyCandles.push({o:o,h:h,l:l,c:c,v:1000+Math.random()*5000,t:Date.now()-i*60000});
+        base=c;
+      }
+      var result=analyze(dummyCandles,dummyCandles[dummyCandles.length-1].c);
+      if(result&&result.score!==undefined&&result.checks){
+        var checkKeys=Object.keys(result.checks);
+        botPass('Indicator Engine','analyze() works ✓ Score: '+result.score+', Checks: '+checkKeys.length+', Grade: '+result.grade);
+      }else{
+        botWarn('Indicator Engine','analyze() ran but returned unexpected format');
+      }
+    }else{
+      botFail('Indicator Engine','analyze() function not found');
+    }
+  }catch(e){botFail('Indicator Engine','Error in analyze(): '+e.message.slice(0,80));}
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 9: Report Generator
+  botInfo('📊 REPORT GENERATOR','Testing genReport() function...');
+  try{
+    var reportHtml=genReport();
+    if(reportHtml&&reportHtml.length>100)botPass('Report Generator','genReport() produced '+reportHtml.length+' chars ✓');
+    else botWarn('Report Generator','genReport() returned short/empty output');
+  }catch(e){botFail('Report Generator','genReport() error: '+e.message.slice(0,80));}
+
+  // CATEGORY 10: Best Setup Detector
+  botInfo('🧠 BEST SETUP DETECTOR','Testing getBestSetups() function...');
+  try{
+    var setups=getBestSetups();
+    botPass('Best Setup Detector','getBestSetups() works ✓ Found '+setups.length+' setups from '+S.trades.length+' trades');
+    var bsHtml=genBestSetupsHtml();
+    if(bsHtml&&bsHtml.length>50)botPass('Best Setups HTML','genBestSetupsHtml() rendered '+bsHtml.length+' chars ✓');
+    else botWarn('Best Setups HTML','Renderer returned minimal output');
+  }catch(e){botFail('Best Setup Detector','Error: '+e.message.slice(0,80));}
+  await new Promise(function(r){setTimeout(r,200);});
+
+  // CATEGORY 11: Canvas/Chart
+  botInfo('🖼️ CHART CANVAS','Testing canvas rendering...');
+  try{
+    var canvas=document.getElementById('mc');
+    if(!canvas){botFail('Chart Canvas','Canvas element not found');return;}
+    if(canvas.getContext){
+      var ctx=canvas.getContext('2d');
+      if(ctx)botPass('Chart Canvas','Canvas 2D context OK — rendering capable ✓');
+      else botFail('Chart Canvas','Cannot get 2D context');
+    }else{
+      botFail('Chart Canvas','Canvas element does not support getContext');
+    }
+    if(S.dataReady)botPass('Chart Data Ready','S.dataReady = true — candles loaded ✓');
+    else botWarn('Chart Data Ready','S.dataReady = false — candles not yet loaded');
+  }catch(e){botFail('Chart Canvas','Error: '+e.message.slice(0,60));}
+
+  // CATEGORY 12: Audio System
+  botInfo('🔊 AUDIO SYSTEM','Checking Web Audio API...');
+  try{
+    var AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(AudioCtx){
+      botPass('Audio System','Web Audio API available — sound alerts supported ✓');
+      botPass('Sound State','Sound '+(S.soundEnabled?'ENABLED':'DISABLED (user preference)'));
+    }else{
+      botWarn('Audio System','Web Audio API not available — no sound alerts');
+    }
+  }catch(e){botWarn('Audio System','Audio check error: '+e.message.slice(0,60));}
+
+  // FINAL SUMMARY
+  BOT.running=false;
+  var finalPass=BOT.results.filter(function(r){return r.status==='PASS';}).length;
+  var finalFail=BOT.results.filter(function(r){return r.status==='FAIL';}).length;
+  var finalWarn=BOT.results.filter(function(r){return r.status==='WARN';}).length;
+  var elapsed=Date.now()-BOT.startTime;
+  botInfo('✅ SCAN COMPLETE','Finished in '+elapsed+'ms — '+finalPass+' passed, '+finalFail+' failed, '+finalWarn+' warnings');
+  botRender();
 }
 
 function genReport(){
