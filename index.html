@@ -3171,6 +3171,34 @@ setTimeout(function(){
 },3000);
 setInterval(()=>{if(S.dataReady)updateUI();},2000);
 
+// ── BACKGROUND PRICE REFRESH for all open position symbols ──
+// Runs every 5s — fetches live price for every symbol that has an open trade,
+// regardless of which chart is currently displayed, so P&L is always live.
+async function refreshOpenPosPrices(){
+  if(!S.open||!S.open.length)return;
+  if(!S.prices)S.prices={};
+  // Collect unique symbols that are NOT the current chart (already updated by tick)
+  let syms=[...new Set(S.open.map(t=>t.sym).filter(s=>s!==S.sym))];
+  for(let sym of syms){
+    let pr=null;
+    // Try Bybit first (geo-block free), then Binance mirror, then Binance main
+    try{pr=await tryBybitPrice(sym);}catch(e){}
+    if(!pr){try{pr=await tryBinancePrice(sym);}catch(e){}}
+    if(pr&&pr>0){
+      S.prices[sym]=pr;
+      // Update open trades P&L for this symbol immediately
+      S.open.forEach(t=>{
+        if(t.sym!==sym)return;
+        t.curPrice=pr;
+        t.pnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
+      });
+    }
+  }
+  if(syms.length&&S.dataReady)updateUI();
+}
+setInterval(refreshOpenPosPrices,5000);
+setTimeout(refreshOpenPosPrices,1500); // run immediately on load too
+
 // ── AUTO-SCAN: populate left scanner automatically after chart loads ──
 setTimeout(()=>{ if(typeof buildScanner==='function') buildScanner(); }, 8000);
 
