@@ -322,7 +322,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.3</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.4</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -677,7 +677,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.3 | 7-Check Confluence + MTF Filter | 20-Coin Smart Monitor</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.4 | 7-Check Confluence + MTF Filter | 20-Coin Parallel Monitor</span>
 </div>
 
 </div>
@@ -2915,7 +2915,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.3 — 20-Coin MTF-Filtered Smart Monitor active','var(--gold)');
+log('🚀 ProTrade AI v4.4 — 20-Coin Parallel Monitor active (3-phase scan)','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
@@ -3006,101 +3006,104 @@ async function runMultiCoinMonitor(){
     return;
   }
   _mcMonRunning=true;
-  log('🔭 Scanning all 20 coins for signals...','var(--cyan)');
+  let _t0=Date.now();
+  log('⚡ Parallel scan — all 20 coins at once...','var(--cyan)');
 
-  let candidates=[]; // collect ALL valid signals, trade top ones
-
-  for(let i=0;i<SCAN_SYMS.length;i++){
-    let sym=SCAN_SYMS[i];
-    if(S.open.find(t=>t.sym===sym))continue; // already in trade
-    if(S.open.length+candidates.filter(c=>c.fired).length>=5)break;
-
+  // ── PHASE 1: Fetch + Analyze all 20 coins simultaneously ─────────────────
+  async function _fetchAnalyze(sym){
+    if(S.open.find(t=>t.sym===sym))return null;
     try{
-      let url='https://api.binance.com/api/v3/klines?symbol='+sym+'&interval='+S.tf+'&limit=100';
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),8000);
-      let r=await fetch(url,{signal:ctrl.signal});
+      let to=setTimeout(()=>ctrl.abort(),9000);
+      let r=await fetch('https://api.binance.com/api/v3/klines?symbol='+sym+'&interval='+S.tf+'&limit=100',{signal:ctrl.signal});
       clearTimeout(to);
-      if(!r.ok)continue;
+      if(!r.ok)return null;
       let raw=await r.json();
-      if(!Array.isArray(raw)||raw.length<40)continue;
-
-      let klines=raw.map(k=>({t:k[0],o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])}));
+      if(!Array.isArray(raw)||raw.length<40)return null;
+      let klines=raw.map(function(k){return{t:k[0],o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])};});
       let pr=klines[klines.length-1].c;
-
-      // Analyze with temp state
-      let savedCandles=S.candles,savedSym=S.sym,savedPrice=S.curPrice;
-      S.candles=klines;S.curPrice=pr;
-      let a=analyze(klines,pr);
-      S.candles=savedCandles;S.sym=savedSym;S.curPrice=savedPrice;
-
-      if(!a)continue;
-      let absScore=Math.abs(a.score);
-
-      // Accept: strong signal score≥32 AND grade A+/A/B AND not blocked
-      if(absScore>=32&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B')){
-
-        // ── MTF CHECK: fetch 1H + 4H for this coin if not cached ──────────
-        let mth=S.mtfData[sym+'_1h'], mt4=S.mtfData[sym+'_4h'];
-        let mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
-        if(!mtfKnown){
-          try{
-            let kl1h=await tryBinanceKlines(sym,'1h',80);
-            if(kl1h&&kl1h.length){let a1h=analyze(kl1h,kl1h[kl1h.length-1].c);if(a1h){S.mtfData[sym+'_1h']=a1h.score;mth=a1h.score;}}
-            let kl4h=await tryBinanceKlines(sym,'4h',80);
-            if(kl4h&&kl4h.length){let a4h=analyze(kl4h,kl4h[kl4h.length-1].c);if(a4h){S.mtfData[sym+'_4h']=a4h.score;mt4=a4h.score;}}
-            mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
-          }catch(e){}
-        }
-
-        // Block if both 1H and 4H strongly oppose the signal
-        let mtfOpp=false;
-        if(mtfKnown){
-          if(a.isBuy&&mth<-18&&mt4<-18){mtfOpp=true;log('⛔ MTF BLOCK '+sym+' BUY — 1H▼'+mth.toFixed(0)+' 4H▼'+mt4.toFixed(0),'var(--gold)');}
-          if(a.isSell&&mth>18&&mt4>18){mtfOpp=true;log('⛔ MTF BLOCK '+sym+' SELL — 1H▲'+mth.toFixed(0)+' 4H▲'+mt4.toFixed(0),'var(--gold)');}
-        }
-        if(mtfOpp)continue;
-
-        let mtfAligned=mtfKnown&&((a.isBuy&&mth>18&&mt4>18)||(a.isSell&&mth<-18&&mt4<-18));
-        candidates.push({a,sym,pr,absScore,mtfAligned});
-        let mtfTag=mtfAligned?' ✔HTF':mtfKnown?' ⚠HTF':'';
-        log('🎯 '+(a.isBuy?'BUY':'SELL')+' signal: '+sym+' score:'+a.score.toFixed(0)+' grade:'+a.grade+' conf:'+a.conf.toFixed(0)+'%'+mtfTag,a.isBuy?'var(--green)':'var(--red)');
-      }
-    }catch(e){}
-
-    await new Promise(res=>setTimeout(res,300)); // rate limit delay
+      let a=analyze(klines,pr); // analyze() is pure — safe to call in parallel
+      if(!a)return null;
+      return{sym,a,pr,absScore:Math.abs(a.score)};
+    }catch(e){return null;}
   }
 
-  // Sort by absolute score descending — trade top signals
-  candidates.sort((a,b)=>b.absScore-a.absScore);
+  let _phase1=await Promise.allSettled(SCAN_SYMS.map(_fetchAnalyze));
+  let _phase1Ok=_phase1.filter(function(r){return r.status==='fulfilled'&&r.value;}).map(function(r){return r.value;});
 
-  let traded=0;
-  let lastTraded=null;
+  // Filter strong signals — grade A+/A/B, score≥32, not blocked
+  let _preCandidates=_phase1Ok.filter(function(d){
+    let a=d.a;
+    return d.absScore>=32&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B');
+  });
+
+  log('⚡ Phase 1 done in '+((Date.now()-_t0)/1000).toFixed(1)+'s — '+_preCandidates.length+' signal(s) pre-qualified out of '+_phase1Ok.length+' loaded','var(--cyan)');
+
+  // ── PHASE 2: MTF check for qualifying coins in parallel ───────────────────
+  async function _checkMTF(d){
+    let sym=d.sym, a=d.a;
+    let mth=S.mtfData[sym+'_1h'], mt4=S.mtfData[sym+'_4h'];
+    let mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
+    if(!mtfKnown){
+      try{
+        let mtfRes=await Promise.allSettled([tryBinanceKlines(sym,'1h',80),tryBinanceKlines(sym,'4h',80)]);
+        let kl1h=mtfRes[0].status==='fulfilled'?mtfRes[0].value:null;
+        let kl4h=mtfRes[1].status==='fulfilled'?mtfRes[1].value:null;
+        if(kl1h&&kl1h.length){let a1h=analyze(kl1h,kl1h[kl1h.length-1].c);if(a1h){S.mtfData[sym+'_1h']=a1h.score;mth=a1h.score;}}
+        if(kl4h&&kl4h.length){let a4h=analyze(kl4h,kl4h[kl4h.length-1].c);if(a4h){S.mtfData[sym+'_4h']=a4h.score;mt4=a4h.score;}}
+        mtfKnown=typeof mth!=='undefined'&&typeof mt4!=='undefined';
+      }catch(e){}
+    }
+    // Block if both 1H + 4H strongly oppose signal direction
+    if(mtfKnown){
+      if(a.isBuy&&mth<-18&&mt4<-18){log('⛔ MTF BLOCK '+sym+' BUY — 1H▼'+mth.toFixed(0)+' 4H▼'+mt4.toFixed(0),'var(--gold)');return null;}
+      if(a.isSell&&mth>18&&mt4>18){log('⛔ MTF BLOCK '+sym+' SELL — 1H▲'+mth.toFixed(0)+' 4H▲'+mt4.toFixed(0),'var(--gold)');return null;}
+    }
+    let mtfAligned=mtfKnown&&((a.isBuy&&mth>18&&mt4>18)||(a.isSell&&mth<-18&&mt4<-18));
+    return{a,sym,pr:d.pr,absScore:d.absScore,mtfAligned};
+  }
+
+  let _phase2=await Promise.allSettled(_preCandidates.map(_checkMTF));
+  let candidates=_phase2.filter(function(r){return r.status==='fulfilled'&&r.value;}).map(function(r){return r.value;});
+
+  // Log all passing signals
+  candidates.forEach(function(c){
+    let mtfTag=c.mtfAligned?' ✔HTF':' ⚠HTF';
+    log('🎯 '+(c.a.isBuy?'BUY':'SELL')+' signal: '+c.sym+' score:'+c.a.score.toFixed(0)+' grade:'+c.a.grade+' conf:'+c.a.conf.toFixed(0)+'%'+mtfTag,c.a.isBuy?'var(--green)':'var(--red)');
+  });
+
+  // Sort best score first
+  candidates.sort(function(a,b){return b.absScore-a.absScore;});
+
+  // ── PHASE 3: Execute trades (only if auto ON) ─────────────────────────────
+  let traded=0, lastTraded=null;
   if(S.auto){
     for(let c of candidates){
       if(S.open.length>=5)break;
       if(S.open.find(t=>t.sym===c.sym))continue;
-      // Reset lastTradeT so multiple coins can trade in same scan
       S.lastTradeT=0;
       log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'%',c.a.isBuy?'var(--green)':'var(--red)');
       execTrade(c.a,true,c.sym);
       playAlert(c.a.isBuy?'buy':'sell');
       traded++;
       lastTraded=c.sym;
-      await new Promise(res=>setTimeout(res,200));
+      await new Promise(function(res){setTimeout(res,200);});
     }
     if(traded>0&&lastTraded){
-      // Switch chart to last traded coin
       document.getElementById('symSel').value=lastTraded;
       S.sym=lastTraded;S.offset=0;
       if(S.ws){try{S.ws.close();}catch(e){}}
       loadSymbol();
     }
   }
+
+  let _elapsed=((Date.now()-_t0)/1000).toFixed(1);
   if(candidates.length===0){
-    log('🔭 Scan done — no qualifying signals on any of 20 coins','var(--gold)');
-  } else if(!S.auto){
-    log('🔭 Scan done — '+candidates.length+' signal(s) found. Enable Auto-Trade to execute.','var(--gold)');
+    log('⚡ Parallel scan done in '+_elapsed+'s — no qualifying signals on 20 coins','var(--gold)');
+  }else if(!S.auto){
+    log('⚡ Parallel scan done in '+_elapsed+'s — '+candidates.length+' signal(s) found. Enable Auto-Trade to execute.','var(--gold)');
+  }else{
+    log('⚡ Parallel scan done in '+_elapsed+'s — '+traded+' trade(s) executed','var(--green)');
   }
 
   _mcMonRunning=false;
