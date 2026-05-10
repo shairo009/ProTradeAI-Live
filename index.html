@@ -3938,6 +3938,8 @@ function appendTyping(){
 
 function removeTyping(){var el=document.getElementById('chatTypingIndicator');if(el)el.remove();}
 
+function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
+
 function setChatStatus(label,color){
   var el=document.getElementById('chatStatus');
   if(!el)return;
