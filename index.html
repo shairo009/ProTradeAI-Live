@@ -520,6 +520,16 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
     </div>
 
+    <div class="rp-sec" id="debugSec">
+      <h4 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleDebug()">
+        <span>&#128302; LIVE DEBUG</span>
+        <span id="debugToggle" style="font-size:8px;color:rgba(150,160,190,.5);font-weight:400">&#9660; HIDE</span>
+      </h4>
+      <div id="debugContent" style="font-family:Courier New,monospace">
+        <div style="color:var(--text2);font-size:9px;text-align:center;padding:6px 0">Waiting for AI signal...</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1432,6 +1442,101 @@ function analyze(candles,curPrice){
   };
 }
 
+// ==================== LIVE DEBUG PANEL ====================
+var _debugOpen = true;
+function toggleDebug(){
+  _debugOpen=!_debugOpen;
+  var c=document.getElementById('debugContent');
+  var t=document.getElementById('debugToggle');
+  if(c)c.style.display=_debugOpen?'block':'none';
+  if(t)t.textContent=_debugOpen?'▼ HIDE':'▶ SHOW';
+}
+
+function updateDebugPanel(a, prevDir, tradeResult){
+  var el=document.getElementById('debugContent');
+  if(!el||!_debugOpen)return;
+  var now=new Date().toLocaleTimeString('en',{hour12:false});
+
+  // Score bar
+  var sc=a.score||0;
+  var scAbs=Math.abs(sc);
+  var scCol=sc>=26?'#00f07a':sc>=12?'#69f0ae':sc<=-26?'#ff2d55':sc<=-12?'#ff5252':'#ffc832';
+  var scBar=Math.min(100,scAbs/50*100);
+
+  // Trade result badge
+  var trBadge='';
+  if(tradeResult==='fired_buy') trBadge='<span style="background:#00f07a;color:#000;padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">▲ BUY FIRED</span>';
+  else if(tradeResult==='fired_sell') trBadge='<span style="background:#ff2d55;color:#fff;padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">▼ SELL FIRED</span>';
+  else if(tradeResult==='blocked_filter') trBadge='<span style="background:rgba(255,200,50,.2);color:#ffc832;padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">⛔ FILTER BLOCKED</span>';
+  else if(tradeResult==='blocked_prevdir') trBadge='<span style="background:rgba(100,120,190,.2);color:var(--cyan);padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">↩ SAME DIR</span>';
+  else if(tradeResult==='blocked_auto') trBadge='<span style="background:rgba(255,255,255,.07);color:var(--text2);padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">⏸ AUTO OFF</span>';
+  else if(tradeResult==='waiting_score') trBadge='<span style="background:rgba(255,200,50,.1);color:#ffc832;padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">⏳ LOW SCORE</span>';
+  else if(tradeResult==='waiting_mtf') trBadge='<span style="background:rgba(255,45,85,.1);color:#ff5252;padding:1px 7px;border-radius:4px;font-weight:900;font-size:9px">⛔ MTF BLOCK</span>';
+  else trBadge='<span style="background:rgba(255,255,255,.05);color:var(--text2);padding:1px 7px;border-radius:4px;font-size:9px">⏳ WAITING</span>';
+
+  // Indicator rows
+  var checks=a.checks||[];
+  var indRows=checks.map(function(ck){
+    var v=ck.v;
+    var col=v===1?'#00f07a':v===-1?'#ff2d55':'rgba(150,160,190,.5)';
+    var ic=v===1?'▲':v===-1?'▼':'─';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px;border-radius:3px;margin-bottom:1px;background:rgba(255,255,255,'+(v!==0?'0.03':'0')+')">'
+      +'<span style="color:rgba(160,170,200,.7);font-size:8.5px">'+ck.n+'</span>'
+      +'<span style="color:'+col+';font-size:9px;font-weight:900">'+ic+' <span style="opacity:.7;font-size:8px">'+ck.d+'</span></span>'
+      +'</div>';
+  }).join('');
+
+  // Filters row
+  var filterRows='';
+  if(a.filters&&a.filters.length){
+    filterRows=a.filters.map(function(f){
+      return '<div style="padding:2px 5px;background:rgba(255,200,50,.08);border-left:2px solid #ffc832;border-radius:2px;margin-bottom:1px;font-size:8px;color:#ffc832">⚠ '+f+'</div>';
+    }).join('');
+  } else {
+    filterRows='<div style="font-size:8px;color:rgba(0,240,122,.6);padding:2px 4px">✓ No active filters</div>';
+  }
+
+  // Thresholds display
+  var th='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:6px">'
+    +'<div style="background:rgba(0,240,122,.06);border:1px solid rgba(0,240,122,.15);border-radius:4px;padding:4px;text-align:center"><div style="font-size:7px;color:rgba(0,240,122,.6);margin-bottom:1px">STRONG BUY</div><div style="font-size:9px;color:#00f07a;font-weight:900">≥ 26 · 4/7</div></div>'
+    +'<div style="background:rgba(0,240,122,.03);border:1px solid rgba(0,240,122,.1);border-radius:4px;padding:4px;text-align:center"><div style="font-size:7px;color:rgba(0,240,122,.5);margin-bottom:1px">WEAK BUY</div><div style="font-size:9px;color:#69f0ae;font-weight:900">≥ 12 · 3/7</div></div>'
+    +'<div style="background:rgba(255,45,85,.06);border:1px solid rgba(255,45,85,.15);border-radius:4px;padding:4px;text-align:center"><div style="font-size:7px;color:rgba(255,45,85,.6);margin-bottom:1px">STRONG SELL</div><div style="font-size:9px;color:#ff2d55;font-weight:900">≤ -26 · 4/7</div></div>'
+    +'<div style="background:rgba(255,45,85,.03);border:1px solid rgba(255,45,85,.1);border-radius:4px;padding:4px;text-align:center"><div style="font-size:7px;color:rgba(255,45,85,.5);margin-bottom:1px">WEAK SELL</div><div style="font-size:9px;color:#ff5252;font-weight:900">≤ -12 · 3/7</div></div>'
+    +'</div>';
+
+  el.innerHTML=[
+    '<div style="font-size:8px;color:rgba(150,160,190,.4);margin-bottom:6px;text-align:right">Updated: '+now+'</div>',
+    // Score row
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px">',
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">',
+    '<span style="font-size:8px;color:rgba(150,160,190,.6)">RAW SCORE</span>',
+    trBadge,
+    '</div>',
+    '<div style="font-size:20px;font-weight:900;color:'+scCol+';letter-spacing:1px">'+(sc>=0?'+':'')+sc.toFixed(4)+'</div>',
+    '<div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:4px;overflow:hidden">',
+    '<div style="height:100%;width:'+scBar+'%;background:'+scCol+';border-radius:2px;transition:width .4s ease"></div>',
+    '</div>',
+    '</div>',
+    // Key stats
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:6px">',
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:5px;text-align:center"><div style="font-size:7px;color:rgba(150,160,190,.5);margin-bottom:2px">CONF%</div><div style="font-size:11px;font-weight:900;color:var(--cyan)">'+a.conf.toFixed(1)+'</div></div>',
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:5px;text-align:center"><div style="font-size:7px;color:rgba(150,160,190,.5);margin-bottom:2px">PREV DIR</div><div style="font-size:11px;font-weight:900;color:'+(prevDir==="buy"?"#00f07a":prevDir==="sell"?"#ff2d55":"rgba(150,160,190,.6)")+'">'+(prevDir||"N").toUpperCase()+'</div></div>',
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:5px;text-align:center"><div style="font-size:7px;color:rgba(150,160,190,.5);margin-bottom:2px">AUTO</div><div style="font-size:11px;font-weight:900;color:'+(S.auto?"#00f07a":"rgba(150,160,190,.5)")+'">'+(S.auto?"ON":"OFF")+'</div></div>',
+    '</div>',
+    // Thresholds
+    th,
+    // Indicator votes
+    '<div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:3px;letter-spacing:1px">7-CHECK VOTES</div>',
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:5px;margin-bottom:6px">',
+    indRows,
+    '</div>',
+    // Filters
+    '<div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:3px;letter-spacing:1px">ACTIVE FILTERS</div>',
+    '<div style="margin-bottom:4px">',filterRows,'</div>',
+  ].join('');
+}
+
+
 function doAI(){
   var prevA=S.lastA;
   var a=analyze(S.candles,S.curPrice);
@@ -1524,6 +1629,25 @@ function doAI(){
   var av2=S.candles.slice(-20).reduce(function(x,c){return x+c.v;},0)/20||1;
   setM('vol',Math.min(100,cv/av2*50),'var(--cyan)',cv>av2*1.3?'HIGH':'AVG');
   updateConfluencePanel(a);
+
+  // Determine trade result for debug panel
+  var _dbgPrevDir=prevDir;
+  var _dbgResult='waiting';
+  if(a.isBuy||a.isBuyWeak||a.isSell||a.isSellWeak){
+    if(S.mtfStatus==='opposed'){_dbgResult='waiting_mtf';}
+    else if(!S.auto){_dbgResult='blocked_auto';}
+    else if(a.isBuy&&prevDir==='buy'){_dbgResult='blocked_prevdir';}
+    else if(a.isSell&&prevDir==='sell'){_dbgResult='blocked_prevdir';}
+    else if(a.isBuyWeak&&prevDir==='buy'){_dbgResult='blocked_prevdir';}
+    else if(a.isSellWeak&&prevDir==='sell'){_dbgResult='blocked_prevdir';}
+    else if(a.isBuy){_dbgResult='fired_buy';}
+    else if(a.isSell){_dbgResult='fired_sell';}
+    else if(a.isBuyWeak&&a.conf>52){_dbgResult='fired_buy';}
+    else if(a.isSellWeak&&a.conf>52){_dbgResult='fired_sell';}
+    else{_dbgResult='waiting_score';}
+  } else if(a.isBlocked){_dbgResult='blocked_filter';}
+  else {_dbgResult='waiting_score';}
+  updateDebugPanel(a,_dbgPrevDir,_dbgResult);
 
   // Signal box
   let sb=document.getElementById('sigBox');
