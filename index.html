@@ -469,7 +469,6 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
       <div class="tf-row">
         <button class="tf active" onclick="setTF('1m')">1m</button>
-        <button class="tf" onclick="setTF('3m')">3m</button>
         <button class="tf" onclick="setTF('5m')">5m</button>
         <button class="tf" onclick="setTF('15m')">15m</button>
         <button class="tf" onclick="setTF('1h')">1H</button>
@@ -2713,7 +2712,7 @@ var AR = {
 };
 
 var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
-var AR_INTERVAL = 120; // seconds per coin (2 minutes)
+var AR_INTERVAL = 20; // seconds per coin
 
 async function fetchTrendingCoins(){
   // Fetch top 20 USDT pairs by 24h quote volume from Binance
@@ -2820,8 +2819,8 @@ async function startAutoRotate(){
 }
 
 // Called from doAI() when auto-rotate is active — extends stay on strong signals
-var AR_EXTEND = 60;         // extra seconds added on signal flash
-var AR_EXTEND_MAX = 180;    // absolute max seconds to stay on one coin
+var AR_EXTEND = 0;          // no signal-based extension — always rotate every 20s
+var AR_EXTEND_MAX = 20;     // hard cap = AR_INTERVAL
 
 function arSignalFlash(a){
   if(!AR.active||AR._signalFlashed)return;
@@ -3985,50 +3984,53 @@ async function sendChat(){
   _chatHistory.push({role:'user',content:msg});
   _chatTyping=true;
   appendTyping();
-  setChatStatus('LIVE DATA...','gold');
-  var liveData=await fetchLiveDataForChat();
-  setChatStatus('THINKING...','gold');
-  var sysPrompt=buildSystemPrompt(liveData);
-  var messages=[{role:'system',content:sysPrompt}].concat(_chatHistory.slice(-12));
   try{
-    var ctrl=new AbortController();
-    var to=setTimeout(function(){ctrl.abort();},60000);
-    var endpoint,headers,bodyObj;
+    setChatStatus('LIVE DATA...','gold');
+    var liveData={prices:[],news:[],reddit:[],fearGreed:null};
+    try{liveData=await fetchLiveDataForChat();}catch(e){}
+    setChatStatus('THINKING...','gold');
+    var sysPrompt=buildSystemPrompt(liveData);
+    var messages=[{role:'system',content:sysPrompt}].concat(_chatHistory.slice(-12));
+    var endpoints=[];
     if(key){
-      endpoint='https://opencode.ai/zen/v1/chat/completions';
-      headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
-      bodyObj={model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5};
-    } else {
-      endpoint='https://text.pollinations.ai/openai';
-      headers={'Content-Type':'application/json'};
-      bodyObj={model:'openai-large',messages:messages,max_tokens:800,temperature:0.5};
+      endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
-    var resp=await fetch(endpoint,{
-      method:'POST',signal:ctrl.signal,
-      headers:headers,
-      body:JSON.stringify(bodyObj)
-    });
-    clearTimeout(to);
-    if(resp.ok){
-      var data=await resp.json();
-      var reply=data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+    // Free fallbacks — try in order
+    endpoints.push({url:'https://api.pollinations.ai/v1/chat/completions',headers:{'Content-Type':'application/json'},body:{model:'openai',messages:messages,max_tokens:800,temperature:0.5}});
+    endpoints.push({url:'https://text.pollinations.ai/openai',headers:{'Content-Type':'application/json'},body:{model:'openai-large',messages:messages,max_tokens:800,temperature:0.5}});
+
+    var reply='';
+    for(var ei=0;ei<endpoints.length;ei++){
+      var ep=endpoints[ei];
+      try{
+        var ctrl=new AbortController();
+        var to=setTimeout(function(){ctrl.abort();},30000);
+        var resp=await fetch(ep.url,{method:'POST',signal:ctrl.signal,headers:ep.headers,body:JSON.stringify(ep.body)});
+        clearTimeout(to);
+        if(resp.ok){
+          var data=await resp.json();
+          reply=data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+          if(reply)break;
+        }
+      }catch(e2){clearTimeout(to);}
+    }
+    removeTyping();
+    if(reply){
       var actions=parseActions(reply);
       _chatHistory.push({role:'assistant',content:reply});
-      removeTyping();
       appendMessage('assistant',reply,actions);
       setChatStatus('READY','green');
     } else {
-      removeTyping();
-      var errBody=await resp.text().catch(function(){return '';});
-      appendMessage('assistant','AI error ('+resp.status+'). Please try again.\n\nError: '+errBody.substring(0,150),[]);
+      appendMessage('assistant','⚠ AI server se jawab nahi aaya. Thodi der baad dobara try karo, ya Settings (⚙) mein OpenCode Zen key add karo for guaranteed access.',[]);
       setChatStatus('ERROR','red');
     }
   }catch(e){
     removeTyping();
-    appendMessage('assistant','Request failed: '+(e.message||'timeout')+'. Please try again.',[]);
+    appendMessage('assistant','Error: '+(e.message||'unknown')+'. Please try again.',[]);
     setChatStatus('ERROR','red');
+  }finally{
+    _chatTyping=false;
   }
-  _chatTyping=false;
   updateChatContext();
 }
 
