@@ -1723,10 +1723,10 @@ function analyze(candles,curPrice){
   if(totalScore>0&&distToRes<0.003&&Math.abs(totalScore)<26)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
   if(totalScore<0&&distToSup<0.003&&Math.abs(totalScore)<26)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
   // Volume is a warning only — does NOT block trades (low vol breakouts are valid)
-  if(totalScore>0&&rsiV>76)filters.push('RSI too high to buy ('+rsiV.toFixed(0)+')');
-  if(totalScore<0&&rsiV<24)filters.push('RSI too low to sell ('+rsiV.toFixed(0)+')');
-  if(totalScore>0&&stochV>75)filters.push('Stoch Overbought ('+stochV.toFixed(0)+') — no buy');
-  if(totalScore<0&&stochV<25)filters.push('Stoch Oversold ('+stochV.toFixed(0)+') — no sell');
+  if(totalScore>0&&rsiV>76&&bullCount<5)filters.push('RSI too high to buy ('+rsiV.toFixed(0)+')');
+  if(totalScore<0&&rsiV<24&&bearCount<5)filters.push('RSI too low to sell ('+rsiV.toFixed(0)+')');
+  if(totalScore>0&&stochV>75&&bullCount<5)filters.push('Stoch Overbought ('+stochV.toFixed(0)+') — no buy');
+  if(totalScore<0&&stochV<25&&bearCount<5)filters.push('Stoch Oversold ('+stochV.toFixed(0)+') — no sell');
   var minConf=totalScore>0?bullCount:bearCount;
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
