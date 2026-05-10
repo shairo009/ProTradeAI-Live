@@ -1908,26 +1908,26 @@ function doAI(){
   var _gradeOk=(a.grade==='A+'||a.grade==='A'||a.grade==='B');
   var _gradeStrict=(a.grade==='A+');
   // Doctor override label for UI
-  var _drLabel=_drBlocked?'<span style="background:rgba(255,45,85,.15);color:#ff5252;font-size:8px;padding:1px 5px;border-radius:3px;margin-left:4px">🩺PAUSED</span>':_drCautious?'<span style="background:rgba(255,180,0,.12);color:#ffc832;font-size:8px;padding:1px 5px;border-radius:3px;margin-left:4px">🩺CAUTIOUS</span>':'';
+  var _drLabel='';
 
   if(a.isBuy){
     sig.innerHTML='⬆ STRONG BUY'+gbadge+_drLabel; sig.style.color='var(--green)';
     btn.className='ai-btn btn-buy'; btn.textContent='▲ EXECUTE BUY — '+a.bullCount+'/7';
-    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('buy');}
+    if(S.auto&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('buy');}
   }else if(a.isBuyWeak){
     sig.innerHTML='↗ BUY'+gbadge+_drLabel; sig.style.color='#69f0ae';
     btn.className='ai-btn btn-buy'; btn.textContent='▲ BUY — '+a.bullCount+'/7 confirm';
     // Weak signal: only trade if Grade A+ AND MTF aligned AND not cautious
-    if(S.auto&&!_drBlocked&&!_drCautious&&!_preMtfOpp&&_gradeStrict&&_preMtfAlign){execTrade(a,true);playAlert('buy');}
+    if(S.auto&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('buy');}
   }else if(a.isSell){
     sig.innerHTML='⬇ STRONG SELL'+gbadge+_drLabel; sig.style.color='var(--red)';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ EXECUTE SELL — '+a.bearCount+'/7';
-    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('sell');}
+    if(S.auto&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('sell');}
   }else if(a.isSellWeak){
     sig.innerHTML='↘ SELL'+gbadge+_drLabel; sig.style.color='#ff5252';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ SELL — '+a.bearCount+'/7 confirm';
     // Weak signal: only trade if Grade A+ AND MTF aligned AND not cautious
-    if(S.auto&&!_drBlocked&&!_drCautious&&!_preMtfOpp&&_gradeStrict&&_preMtfAlign){execTrade(a,true);playAlert('sell');}
+    if(S.auto&&!_preMtfOpp&&_gradeOk){execTrade(a,true);playAlert('sell');}
   }else if(a.isBlocked&&Math.abs(a.score)>22){
     sig.innerHTML=(a.score>0?'⬆':'⬇')+' FILTERED'+gbadge; sig.style.color='var(--gold)';
     btn.className='ai-btn btn-wait';
@@ -2000,10 +2000,10 @@ function doAI(){
   if(a.isBuy||a.isBuyWeak||a.isSell||a.isSellWeak){
     if(S.mtfStatus==='opposed'){_dbgResult='waiting_mtf';}
     else if(!S.auto){_dbgResult='blocked_auto';}
-    else if(a.isBuy&&prevDir==='buy'){_dbgResult='blocked_prevdir';}
-    else if(a.isSell&&prevDir==='sell'){_dbgResult='blocked_prevdir';}
-    else if(a.isBuyWeak&&prevDir==='buy'){_dbgResult='blocked_prevdir';}
-    else if(a.isSellWeak&&prevDir==='sell'){_dbgResult='blocked_prevdir';}
+    
+    
+    
+    
     else if(a.isBuy){_dbgResult='fired_buy';}
     else if(a.isSell){_dbgResult='fired_sell';}
     else if(a.isBuyWeak&&a.conf>52){_dbgResult='fired_buy';}
