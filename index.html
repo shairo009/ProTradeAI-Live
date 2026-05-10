@@ -1386,8 +1386,8 @@ function analyze(candles,curPrice){
   // SMART FILTERS — gate that blocks low-quality trades
   var filters=[];
   var distToRes=(hi20-pr)/pr, distToSup=(pr-lo20)/pr;
-  if(totalScore>0&&distToRes<0.003)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
-  if(totalScore<0&&distToSup<0.003)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
+  if(totalScore>0&&distToRes<0.003&&Math.abs(totalScore)<26)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
+  if(totalScore<0&&distToSup<0.003&&Math.abs(totalScore)<26)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
   // Volume is a warning only — does NOT block trades (low vol breakouts are valid)
   if(totalScore>0&&rsiV>76)filters.push('RSI too high to buy ('+rsiV.toFixed(0)+')');
   if(totalScore<0&&rsiV<24)filters.push('RSI too low to sell ('+rsiV.toFixed(0)+')');
