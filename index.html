@@ -306,8 +306,8 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <div id="aiChatModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(4,8,16,.96);backdrop-filter:blur(8px);flex-direction:column">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(61,142,255,.3);background:rgba(6,10,18,.9);flex-shrink:0">
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:14px;font-weight:900;color:var(--cyan);letter-spacing:2px">🤖 GLM 4.7 — ProTrade AI Assistant</span>
-      <span id="chatModelBadge" style="font-size:8px;padding:2px 8px;border-radius:10px;background:rgba(61,142,255,.15);border:1px solid rgba(61,142,255,.3);color:var(--blue)">z-ai/glm4.7 via NVIDIA NIM</span>
+      <span style="font-size:14px;font-weight:900;color:var(--cyan);letter-spacing:2px">🤖 MiniMax M2.5 — ProTrade AI Assistant</span>
+      <span id="chatModelBadge" style="font-size:8px;padding:2px 8px;border-radius:10px;background:rgba(61,142,255,.15);border:1px solid rgba(61,142,255,.3);color:var(--blue)">minimax-m2.5-free via OpenCode Zen</span>
       <span id="chatStatus" style="font-size:8px;padding:2px 8px;border-radius:10px;background:rgba(0,240,122,.1);border:1px solid rgba(0,240,122,.3);color:var(--green)">READY</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -335,17 +335,17 @@ tr:hover td{background:rgba(61,142,255,.04)}
       <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
         <div style="text-align:center;padding:20px 0">
           <div style="font-size:32px;margin-bottom:8px">🤖</div>
-          <div style="color:var(--cyan);font-size:13px;font-weight:900;margin-bottom:6px">GLM 4.7 Trading Assistant</div>
+          <div style="color:var(--cyan);font-size:13px;font-weight:900;margin-bottom:6px">MiniMax M2.5 Trading Assistant</div>
           <div style="color:rgba(150,160,190,.6);font-size:10px;max-width:400px;margin:0 auto;line-height:1.6">Main aapke poore trading terminal ka data dekh sakta hoon — trades, signals, indicators, balance, AI memory, news. Kuch bhi poochho ya action lene ko kaho.</div>
-          <div style="margin-top:12px;font-size:9px;color:rgba(150,160,190,.4)">⚠ NVIDIA key Settings mein enter karo to activate</div>
+          <div style="margin-top:12px;font-size:9px;color:rgba(150,160,190,.4)">⚠ OpenCode Zen key Settings mein enter karo to activate</div>
         </div>
       </div>
       <div style="padding:12px;border-top:1px solid rgba(255,255,255,.06);background:rgba(6,10,18,.8);flex-shrink:0">
         <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea id="chatInput" placeholder="GLM se kuch bhi poochho — trades, signals, market analysis, ya koi bhi setting change karne ko kaho..." style="flex:1;background:rgba(14,22,34,.8);border:1px solid rgba(61,142,255,.3);border-radius:8px;color:var(--text);padding:10px 12px;font-size:11px;font-family:JetBrains Mono,monospace;resize:none;height:52px;outline:none;line-height:1.5" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+          <textarea id="chatInput" placeholder="MiniMax se kuch bhi poochho — trades, signals, market analysis, ya koi bhi setting change karne ko kaho..." style="flex:1;background:rgba(14,22,34,.8);border:1px solid rgba(61,142,255,.3);border-radius:8px;color:var(--text);padding:10px 12px;font-size:11px;font-family:JetBrains Mono,monospace;resize:none;height:52px;outline:none;line-height:1.5" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
           <button onclick="sendChat()" id="chatSendBtn" style="padding:10px 18px;background:linear-gradient(135deg,rgba(61,142,255,.3),rgba(191,95,255,.2));border:1px solid rgba(61,142,255,.5);color:var(--cyan);border-radius:8px;font-weight:900;font-size:11px;cursor:pointer;height:52px;white-space:nowrap;flex-shrink:0">▶ Send</button>
         </div>
-        <div style="font-size:8px;color:rgba(150,160,190,.3);margin-top:4px">Enter = send · Shift+Enter = new line · GLM 4.7 has full access to your terminal data</div>
+        <div style="font-size:8px;color:rgba(150,160,190,.3);margin-top:4px">Enter = send · Shift+Enter = new line · MiniMax M2.5 has full access to your terminal data</div>
       </div>
     </div>
   </div>
@@ -358,9 +358,9 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <div class="modal-sub">Configure API keys for live data & AI Intelligence Bot</div>
     <label class="modal-label">CoinGecko API Key (Free — 30 calls/min)</label>
     <input class="modal-input" id="geckoKeyInput" type="password" placeholder="CG-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
-    <label class="modal-label" style="margin-top:10px">🤖 NVIDIA NIM API Key (for Intelligence Bot — GLM 4.7)</label>
-    <input class="modal-input" id="nvidiaKeyInput" type="password" placeholder="nvapi-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
-    <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get free key at <a href="https://build.nvidia.com" target="_blank" style="color:var(--cyan)">build.nvidia.com</a> — needed for AI news analysis</div>
+    <label class="modal-label" style="margin-top:10px">🤖 OpenCode Zen API Key (for Intelligence Bot — MiniMax M2.5 Free)</label>
+    <input class="modal-input" id="opencodezenKeyInput" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get free key at <a href="https://opencode.ai/workspace" target="_blank" style="color:var(--cyan)">opencode.ai/workspace</a> — MiniMax M2.5 Free is 100% free on OpenCode Zen</div>
     <div id="modalStatus" class="modal-status"></div>
     <div class="modal-info">
       🌐 Get a FREE key at <a href="https://www.coingecko.com/en/api" target="_blank">coingecko.com/en/api</a><br>
@@ -563,7 +563,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
         <span>🕵️ INTEL BOT</span>
         <span id="intelStatus" style="font-size:8px;padding:2px 7px;border-radius:10px;background:rgba(255,200,50,.1);color:var(--gold);border:1px solid rgba(255,200,50,.3)">OFFLINE</span>
       </h4>
-      <div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:6px">Real-time news · Whale alerts · Reddit · AI sentiment via GLM 4.7</div>
+      <div style="font-size:8px;color:rgba(150,160,190,.5);margin-bottom:6px">Real-time news · Whale alerts · Reddit · AI sentiment via OpenCode Zen MiniMax</div>
       <div id="intelSentBar" style="display:flex;gap:4px;margin-bottom:6px;display:none">
         <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBullPct" style="background:rgba(0,240,122,.1);color:var(--green)">--% BULL</div>
         <div style="flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:900" id="intelBearPct" style="background:rgba(255,45,85,.1);color:var(--red)">--% BEAR</div>
@@ -571,7 +571,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
       <div id="intelAiVerdict" style="display:none;padding:6px 8px;border-radius:5px;font-size:9px;line-height:1.5;margin-bottom:6px"></div>
       <div id="intelFeed" style="max-height:220px;overflow-y:auto">
-        <div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:10px">Add NVIDIA key in Settings (⚙) to activate Intel Bot</div>
+        <div style="color:rgba(150,160,190,.4);font-size:9px;text-align:center;padding:10px">Add OpenCode Zen key in Settings (⚙) to activate Intel Bot</div>
       </div>
       <button onclick="IntelBot.refresh()" style="margin-top:6px;width:100%;font-size:9px;padding:4px 0;background:rgba(0,232,255,.08);border:1px solid rgba(0,232,255,.2);color:var(--cyan);border-radius:4px;cursor:pointer">⟳ Refresh Intel</button>
     </div>
@@ -716,7 +716,7 @@ function openSettings(){
   const inp=document.getElementById('geckoKeyInput');
   const st=document.getElementById('modalStatus');
   inp.value=getGeckoKey();
-  var nki=document.getElementById('nvidiaKeyInput');if(nki)nki.value=localStorage.getItem('ptai_nvidia_key')||'';
+  var nki=document.getElementById('opencodezenKeyInput');if(nki)nki.value=localStorage.getItem('ptai_opencodezen_key')||'';
   st.className='modal-status';
   st.textContent='';
   m.classList.add('open');
@@ -752,9 +752,9 @@ async function saveGeckoKey(){
     clearTimeout(to);
     if(r.ok||(r.status===429)){
       localStorage.setItem(GECKO_KEY_LS,key);
-      var nk=document.getElementById('nvidiaKeyInput');if(nk&&nk.value.trim())localStorage.setItem('ptai_nvidia_key',nk.value.trim());
+      var nk=document.getElementById('opencodezenKeyInput');if(nk&&nk.value.trim())localStorage.setItem('ptai_opencodezen_key',nk.value.trim());
       st.className='modal-status ok';
-      st.textContent='✅ Keys saved! CoinGecko + NVIDIA AI configured.';
+      st.textContent='✅ Keys saved! CoinGecko + OpenCode Zen MiniMax AI configured.';
       updateApiBadge();
       IntelBot.start();
       setTimeout(()=>{closeSettings();loadSym();},1200);
@@ -766,7 +766,7 @@ async function saveGeckoKey(){
   }catch(e){
     // Network error — save anyway (could just be CORS on ping)
     localStorage.setItem(GECKO_KEY_LS,key);
-    var nk2=document.getElementById('nvidiaKeyInput');if(nk2&&nk2.value.trim())localStorage.setItem('ptai_nvidia_key',nk2.value.trim());
+    var nk2=document.getElementById('opencodezenKeyInput');if(nk2&&nk2.value.trim())localStorage.setItem('ptai_opencodezen_key',nk2.value.trim());
     st.className='modal-status ok';
     st.textContent='✅ Keys saved! (Could not verify CoinGecko — will use on next request.)';
     updateApiBadge();
@@ -1524,7 +1524,7 @@ function renderMemoryPanel(){
     +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="font-size:8px">'+learned+'</span>'
     +'<div style="display:flex;gap:4px">'
-    +'<button onclick="glmPeriodicReview()" style="font-size:7px;padding:2px 6px;background:rgba(191,95,255,.1);border:1px solid rgba(191,95,255,.3);color:var(--purple);border-radius:3px;cursor:pointer">🤖 GLM Tune</button>'
+    +'<button onclick="glmPeriodicReview()" style="font-size:7px;padding:2px 6px;background:rgba(191,95,255,.1);border:1px solid rgba(191,95,255,.3);color:var(--purple);border-radius:3px;cursor:pointer">🤖 AI Tune</button>'
     +'<button onclick="AIMemory.reset()" style="font-size:7px;padding:2px 6px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:#ff5252;border-radius:3px;cursor:pointer">RESET</button>'
     +'</div>'
     +'</div>';
@@ -3298,10 +3298,10 @@ var IntelBot = (function(){
   var _running = false;
   var _lastFetch = 0;
   var INTERVAL = 5 * 60 * 1000; // 5 minutes
-  var NVIDIA_EP = 'https://integrate.api.nvidia.com/v1/chat/completions';
-  var NVIDIA_MODEL = 'z-ai/glm4.7';
+  var OR_EP = 'https://opencode.ai/zen/v1/chat/completions';
+  var OR_MODEL = 'minimax-m2.5-free';
 
-  function getNvidiaKey(){ return localStorage.getItem('ptai_nvidia_key')||''; }
+  function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
 
   function setStatus(label, color){
     var el = document.getElementById('intelStatus');
@@ -3369,7 +3369,7 @@ var IntelBot = (function(){
   }
 
   async function analyzeWithGLM(news, reddit){
-    var key = getNvidiaKey();
+    var key = getZenKey();
     if(!key){ return null; }
     var newsText = news.slice(0,8).map(function(n,i){return (i+1)+'. '+n.title;}).join('\n');
     var redditText = reddit.slice(0,5).map(function(p,i){return (i+1)+'. ['+p.sub+'] '+p.title+' ('+p.score+' upvotes)';}).join('\n');
@@ -3379,10 +3379,10 @@ var IntelBot = (function(){
     try{
       var ctrl = new AbortController();
       var to = setTimeout(function(){ctrl.abort();}, 20000);
-      var resp = await fetch(NVIDIA_EP, {
+      var resp = await fetch(OR_EP, {
         method:'POST', signal:ctrl.signal,
-        headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-        body:JSON.stringify({model:NVIDIA_MODEL, messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.3})
+        headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json',},
+        body:JSON.stringify({model:OR_MODEL, messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.3})
       });
       clearTimeout(to);
       if(resp.ok){
@@ -3412,7 +3412,7 @@ var IntelBot = (function(){
     vEl.style.display='block';
     vEl.style.background = sent==='bullish'?'rgba(0,240,122,.06)':sent==='bearish'?'rgba(255,45,85,.06)':'rgba(255,200,50,.06)';
     vEl.style.border = '1px solid '+(sent==='bullish'?'rgba(0,240,122,.2)':sent==='bearish'?'rgba(255,45,85,.2)':'rgba(255,200,50,.2)');
-    vEl.innerHTML = '<div style="font-weight:900;color:'+sentCol+';margin-bottom:4px">'+sentIcon+' GLM 4.7: '+(analysis.trade_bias||sent.toUpperCase())+'</div>'
+    vEl.innerHTML = '<div style="font-weight:900;color:'+sentCol+';margin-bottom:4px">'+sentIcon+' MiniMax M2.5: '+(analysis.trade_bias||sent.toUpperCase())+'</div>'
       +'<div style="color:rgba(200,210,230,.8);line-height:1.5">'+( analysis.verdict||'' )+'</div>'
       +(analysis.key_events&&analysis.key_events.length?'<div style="margin-top:5px;font-size:8px;color:rgba(150,160,190,.7)">⚡ '+(analysis.key_events||[]).slice(0,3).join(' · ')+'</div>':'');
     if(sBar){
@@ -3427,7 +3427,7 @@ var IntelBot = (function(){
   }
 
   async function run(){
-    if(!getNvidiaKey()){ setStatus('NO KEY','gold'); return; }
+    if(!getZenKey()){ setStatus('NO KEY','gold'); return; }
     setStatus('SCANNING...','gold');
     _lastFetch = Date.now();
     try{
@@ -3462,7 +3462,7 @@ var IntelBot = (function(){
 
       // AI Analysis
       if(news.length>0||reddit.length>0){
-        setStatus('GLM ANALYZING...','gold');
+        setStatus('AI ANALYZING...','gold');
         var analysis = await analyzeWithGLM(news, reddit);
         renderAIVerdict(analysis);
         if(analysis){ setStatus('LIVE ✓','green'); }
@@ -3493,7 +3493,7 @@ var IntelBot = (function(){
 })();
 
 // Auto-start Intel Bot if key exists
-(function(){ if(localStorage.getItem('ptai_nvidia_key')){ setTimeout(function(){IntelBot.start();},3000); } })();
+(function(){ if(localStorage.getItem('ptai_opencodezen_key')){ setTimeout(function(){IntelBot.start();},3000); } })();
 
 
 // ==================== 🤖 AI CHAT SYSTEM ====================
@@ -3669,7 +3669,7 @@ function appendTyping(){
   d.id='chatTypingIndicator';
   d.style.cssText='display:flex;gap:10px;align-items:flex-start';
   d.innerHTML='<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:rgba(191,95,255,.2);border:1px solid rgba(191,95,255,.4)">🤖</div>'
-    +'<div style="padding:10px 14px;border-radius:4px 12px 12px 12px;background:rgba(191,95,255,.08);border:1px solid rgba(191,95,255,.2);font-size:10px;color:rgba(150,160,190,.6)">GLM 4.7 soch raha hai <span style="animation:blink 1s infinite">...</span></div>';
+    +'<div style="padding:10px 14px;border-radius:4px 12px 12px 12px;background:rgba(191,95,255,.08);border:1px solid rgba(191,95,255,.2);font-size:10px;color:rgba(150,160,190,.6)">MiniMax M2.5 soch raha hai <span style="animation:blink 1s infinite">...</span></div>';
   msgs.appendChild(d);
   msgs.scrollTop=msgs.scrollHeight;
 }
@@ -3690,8 +3690,8 @@ async function sendChat(){
   var inp=document.getElementById('chatInput');
   var msg=(inp&&inp.value||'').trim();
   if(!msg)return;
-  var key=getNvidiaKey();
-  if(!key){appendMessage('assistant','NVIDIA key nahi mili! Settings mein key enter karo phir try karo.',[]);return;}
+  var key=getZenKey();
+  if(!key){appendMessage('assistant','OpenCode Zen key nahi mili! Settings mein key enter karo phir try karo.',[]);return;}
   inp.value='';
   appendMessage('user',msg,[]);
   _chatHistory.push({role:'user',content:msg});
@@ -3705,10 +3705,10 @@ async function sendChat(){
   try{
     var ctrl=new AbortController();
     var to=setTimeout(function(){ctrl.abort();},45000);
-    var resp=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{
+    var resp=await fetch('https://opencode.ai/zen/v1/chat/completions',{
       method:'POST',signal:ctrl.signal,
-      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'z-ai/glm4.7',messages:messages,max_tokens:800,temperature:0.5})
+      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json',},
+      body:JSON.stringify({model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5})
     });
     clearTimeout(to);
     if(resp.ok){
@@ -3722,12 +3722,12 @@ async function sendChat(){
     } else {
       removeTyping();
       var errBody=await resp.text().catch(function(){return '';});
-      appendMessage('assistant','GLM error ('+resp.status+'). Settings mein NVIDIA key check karo.\n\nError: '+errBody.substring(0,150),[]);
+      appendMessage('assistant','MiniMax error ('+resp.status+'). Settings mein OpenCode Zen key check karo.\n\nError: '+errBody.substring(0,150),[]);
       setChatStatus('ERROR','red');
     }
   }catch(e){
     removeTyping();
-    appendMessage('assistant','Request failed: '+(e.message||'timeout')+'.\n\nSettings mein NVIDIA key check karo.',[]);
+    appendMessage('assistant','Request failed: '+(e.message||'timeout')+'.\n\nSettings mein OpenCode Zen key check karo.',[]);
     setChatStatus('ERROR','red');
   }
   _chatTyping=false;
@@ -3743,7 +3743,7 @@ var GLM_REVIEW_EVERY = 5; // deep review every 5 trades
 
 // Called after every trade close — GLM analyzes it and tunes Memory weights
 async function glmLearnFromTrade(trade){
-  var key = getNvidiaKey();
+  var key = getZenKey();
   if(!key || _glmLearning) return;
   _glmLearning = true;
   _tradesSinceReview++;
@@ -3777,10 +3777,10 @@ async function glmLearnFromTrade(trade){
   try{
     var ctrl = new AbortController();
     var to = setTimeout(function(){ctrl.abort();}, 30000);
-    var resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    var resp = await fetch('https://opencode.ai/zen/v1/chat/completions', {
       method: 'POST', signal: ctrl.signal,
-      headers: {'Authorization':'Bearer '+key, 'Content-Type':'application/json'},
-      body: JSON.stringify({model:'z-ai/glm4.7', messages:[{role:'user',content:prompt}], max_tokens:300, temperature:0.2})
+      headers: {'Authorization':'Bearer '+key, 'Content-Type':'application/json', 'HTTP-Referer':'https://protrade-ai.replit.app', 'X-Title':'ProTrade AI'},
+      body: JSON.stringify({model:'minimax-m2.5-free', messages:[{role:'user',content:prompt}], max_tokens:300, temperature:0.2})
     });
     clearTimeout(to);
     if(resp.ok){
@@ -3807,7 +3807,7 @@ async function glmLearnFromTrade(trade){
 
 // Full deep review — GLM looks at all recent trades and memory stats together
 async function glmPeriodicReview(){
-  var key = getNvidiaKey();
+  var key = getZenKey();
   if(!key) return;
 
   var recentTrades = (S.trades||[]).slice(-15).map(function(t){
@@ -3840,10 +3840,10 @@ async function glmPeriodicReview(){
   try{
     var ctrl = new AbortController();
     var to = setTimeout(function(){ctrl.abort();}, 40000);
-    var resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    var resp = await fetch('https://opencode.ai/zen/v1/chat/completions', {
       method:'POST', signal:ctrl.signal,
-      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'z-ai/glm4.7', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.2})
+      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json',},
+      body:JSON.stringify({model:'minimax-m2.5-free', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.2})
     });
     clearTimeout(to);
     if(resp.ok){
