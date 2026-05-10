@@ -561,6 +561,8 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <script>
 // ==================== STATE ====================
 const SYMS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','FTMUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
+// ── Must be at top so loadState() can access it before its definition line ──
+const _STATE_KEY='protradeai_v4_state';
 
 const S = {
   bal:10000, startBal:10000,
@@ -2498,8 +2500,6 @@ setTimeout(()=>{if(S.dataReady)renderAll();},1000);
 setTimeout(()=>{if(S.dataReady)renderAll();},3000);
 
 // ==================== LOCALSTORAGE PERSISTENCE ====================
-const _STATE_KEY='protradeai_v4_state';
-
 function saveState(){
   try{
     localStorage.setItem(_STATE_KEY,JSON.stringify({
