@@ -1728,10 +1728,10 @@ function analyze(candles,curPrice){
   var isBlocked=filters.length>0;
 
   // SIGNAL DECISION — world-class strict thresholds (5/7 confluence + high score)
-  var isBuy=totalScore>=40&&bullCount>=5&&!isBlocked;
-  var isBuyWeak=totalScore>=26&&bullCount>=4&&!isBlocked;
-  var isSell=totalScore<=-40&&bearCount>=5&&!isBlocked;
-  var isSellWeak=totalScore<=-26&&bearCount>=4&&!isBlocked;
+  var isBuy=totalScore>=40&&bullCount>=6&&!isBlocked;
+  var isBuyWeak=totalScore>=26&&bullCount>=5&&!isBlocked;
+  var isSell=totalScore<=-40&&bearCount>=6&&!isBlocked;
+  var isSellWeak=totalScore<=-26&&bearCount>=5&&!isBlocked;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
@@ -1741,7 +1741,7 @@ function analyze(candles,curPrice){
 
   // Grade
   var grade='D';
-  if(Math.abs(totalScore)>=60&&minConf>=5&&volRatio>1.2)grade='A+';
+  if(Math.abs(totalScore)>=60&&minConf>=6&&volRatio>1.2)grade='A+';
   else if(Math.abs(totalScore)>=45&&minConf>=4)grade='A';
   else if(Math.abs(totalScore)>=30&&minConf>=4)grade='B';
   else if(Math.abs(totalScore)>=20&&minConf>=3)grade='C';
@@ -2695,7 +2695,7 @@ var AR = {
 };
 
 var AR_FIXED = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
-var AR_INTERVAL = 20; // seconds per coin
+var AR_INTERVAL = 120; // seconds per coin (2 minutes)
 
 async function fetchTrendingCoins(){
   // Fetch top 20 USDT pairs by 24h quote volume from Binance
@@ -2742,7 +2742,7 @@ function _arUpdateUI(){
     if(btn){btn.style.background='rgba(0,230,118,.12)';btn.style.borderColor='rgba(0,230,118,.5)';btn.style.color='var(--green)';btn.textContent='⏸ PAUSE';btn.title='Auto-rotating every 20s — click to pause';}
     if(symLbl) symLbl.textContent=(AR.coins[AR.idx]||'').replace('USDT','')+'/USDT';
     if(idxLbl) idxLbl.textContent=(AR.idx+1)+'/'+AR.coins.length;
-    if(cdLbl) cdLbl.textContent=AR.countdown+'s';
+    if(cdLbl){var m=Math.floor(AR.countdown/60),s=AR.countdown%60;cdLbl.textContent=AR.countdown>=60?m+':'+(s<10?'0':'')+s:AR.countdown+'s';}
     if(prog){
       var pct=Math.round((AR.countdown/AR_INTERVAL)*100);
       prog.style.width=pct+'%';
@@ -2802,8 +2802,8 @@ async function startAutoRotate(){
 }
 
 // Called from doAI() when auto-rotate is active — extends stay on strong signals
-var AR_EXTEND = 40;         // extra seconds added on signal flash
-var AR_EXTEND_MAX = 90;     // absolute max seconds to stay on one coin
+var AR_EXTEND = 60;         // extra seconds added on signal flash
+var AR_EXTEND_MAX = 180;    // absolute max seconds to stay on one coin
 
 function arSignalFlash(a){
   if(!AR.active||AR._signalFlashed)return;
@@ -2844,7 +2844,7 @@ function arSignalFlash(a){
 
   _arUpdateUI();
   var sym=(AR.coins[AR.idx]||'').replace('USDT','');
-  log('⚡ SIGNAL FLASH — '+icon+' '+dir+' ('+a.grade+') on '+sym+' — staying '+(extra+0)+'s longer!', col);
+  log('⚡ SIGNAL FLASH — '+icon+' '+dir+' ('+a.grade+') on '+sym+' — staying '+(extra>=60?Math.round(extra/60)+'min':extra+'s')+' longer!', col);
 }
 
 function stopAutoRotate(){
