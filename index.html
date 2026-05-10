@@ -2414,15 +2414,22 @@ function monitorTrades(){
 if(!window._tradeWatchdog){
   window._tradeWatchdog=setInterval(function(){
     if(!S.open||!S.open.length)return;
-    let pr=S.curPrice;
+    if(!S.prices)S.prices={};
     let now=Date.now();
     [...S.open].forEach(function(t){
-      // Force-close trades stuck open > 2 hours with no price update
+      // Use per-symbol price, fallback to curPrice
+      let pr=(S.prices[t.sym]||t.curPrice||S.curPrice);
       let age=(now-t.openTs)/60000;
-      if(age>120){
-        let exitPr=pr||t.entry;
-        log('⏰ Force-close: '+t.sym+' open '+Math.round(age)+'min — unstuck','var(--gold)');
-        closeTrade(t,exitPr,'Watchdog Close ⏰');
+      // Force-close trades stuck open > 2 hours
+      if(age>120&&pr){
+        log('⏰ Force-close: '+t.sym+' open '+Math.round(age)+'min','var(--gold)');
+        closeTrade(t,pr,'Watchdog Close ⏰');
+        return;
+      }
+      // Emergency: if SL should have hit but didn't (price way past SL)
+      if(pr&&t.sl){
+        if(t.dir==='BUY'&&pr<t.sl*0.995){closeTrade(t,pr,'Emergency SL 🛑');return;}
+        if(t.dir==='SELL'&&pr>t.sl*1.005){closeTrade(t,pr,'Emergency SL 🛑');return;}
       }
     });
     if(S.dataReady)updateUI();
@@ -3177,24 +3184,46 @@ setInterval(()=>{if(S.dataReady)updateUI();},2000);
 async function refreshOpenPosPrices(){
   if(!S.open||!S.open.length)return;
   if(!S.prices)S.prices={};
-  // Collect unique symbols that are NOT the current chart (already updated by tick)
-  let syms=[...new Set(S.open.map(t=>t.sym).filter(s=>s!==S.sym))];
+  // ALL open symbols — current chart gets its price from tick, but we also check
+  // SL/TP here so non-current symbols don't get stuck
+  let syms=[...new Set(S.open.map(t=>t.sym))];
+  let changed=false;
   for(let sym of syms){
     let pr=null;
-    // Try Bybit first (geo-block free), then Binance mirror, then Binance main
-    try{pr=await tryBybitPrice(sym);}catch(e){}
-    if(!pr){try{pr=await tryBinancePrice(sym);}catch(e){}}
-    if(pr&&pr>0){
-      S.prices[sym]=pr;
-      // Update open trades P&L for this symbol immediately
-      S.open.forEach(t=>{
-        if(t.sym!==sym)return;
-        t.curPrice=pr;
-        t.pnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
-      });
+    if(sym===S.sym){
+      pr=S.prices[sym]||S.curPrice; // already updated by tick
+    } else {
+      // Fetch live price for non-current symbol
+      try{pr=await tryBybitPrice(sym);}catch(e){}
+      if(!pr){try{pr=await tryBinancePrice(sym);}catch(e){}}
     }
+    if(!pr||pr<=0)continue;
+    S.prices[sym]=pr;
+    // Process each trade for this symbol — update P&L AND check SL/TP
+    [...S.open].forEach(t=>{
+      if(t.sym!==sym)return;
+      t.curPrice=pr;
+      t.pnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
+      changed=true;
+      // ── SL / TP checks (same logic as monitorTrades) ──
+      if(t.dir==='BUY'){
+        if(pr<=t.sl){closeTrade(t,t.sl,'SL Hit ❌');return;}
+        if(pr>=t.tp4&&t.tpHit<4){closeTrade(t,t.tp4,'TP4 🎯🎯🎯');return;}
+        if(pr>=t.tp3&&t.tpHit<3){t.tpHit=3;log('🎯 TP3: '+t.sym,'var(--green)');}
+        if(pr>=t.tp2&&t.tpHit<2){t.tpHit=2;closeTrade(t,t.tp2,'TP2 🎯');return;}
+        if(pr>=t.tp1&&t.tpHit<1){t.tpHit=1;log('🎯 TP1: '+t.sym,'var(--green)');}
+      } else {
+        if(pr>=t.sl){closeTrade(t,t.sl,'SL Hit ❌');return;}
+        if(pr<=t.tp4&&t.tpHit<4){closeTrade(t,t.tp4,'TP4 🎯🎯🎯');return;}
+        if(pr<=t.tp3&&t.tpHit<3){t.tpHit=3;log('🎯 TP3: '+t.sym,'var(--green)');}
+        if(pr<=t.tp2&&t.tpHit<2){t.tpHit=2;closeTrade(t,t.tp2,'TP2 🎯');return;}
+        if(pr<=t.tp1&&t.tpHit<1){t.tpHit=1;log('🎯 TP1: '+t.sym,'var(--green)');}
+      }
+      // Max loss cut: if loss > 2× risk, force close
+      if(t.pnl<-(t.riskAmt||50)*2){closeTrade(t,pr,'Max Loss Cut 🛑');return;}
+    });
   }
-  if(syms.length&&S.dataReady)updateUI();
+  if(changed&&S.dataReady)updateUI();
 }
 setInterval(refreshOpenPosPrices,5000);
 setTimeout(refreshOpenPosPrices,1500); // run immediately on load too
