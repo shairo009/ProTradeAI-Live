@@ -1913,7 +1913,7 @@ function doAI(){
   if(a.isBuy){
     sig.innerHTML='⬆ STRONG BUY'+gbadge+_drLabel; sig.style.color='var(--green)';
     btn.className='ai-btn btn-buy'; btn.textContent='▲ EXECUTE BUY — '+a.bullCount+'/7';
-    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk&&(_preMtfAlign||!_mtfKnown)&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
+    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
   }else if(a.isBuyWeak){
     sig.innerHTML='↗ BUY'+gbadge+_drLabel; sig.style.color='#69f0ae';
     btn.className='ai-btn btn-buy'; btn.textContent='▲ BUY — '+a.bullCount+'/7 confirm';
@@ -1922,7 +1922,7 @@ function doAI(){
   }else if(a.isSell){
     sig.innerHTML='⬇ STRONG SELL'+gbadge+_drLabel; sig.style.color='var(--red)';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ EXECUTE SELL — '+a.bearCount+'/7';
-    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk&&(_preMtfAlign||!_mtfKnown)&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
+    if(S.auto&&!_drBlocked&&!_preMtfOpp&&_gradeOk&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
   }else if(a.isSellWeak){
     sig.innerHTML='↘ SELL'+gbadge+_drLabel; sig.style.color='#ff5252';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ SELL — '+a.bearCount+'/7 confirm';
