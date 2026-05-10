@@ -22,7 +22,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:'JetBr
 #app{display:flex;flex-direction:column;height:100vh;min-height:600px}
 
 /* ========== HEADER ========== */
-.hdr{background:linear-gradient(180deg,var(--bg1) 0%,rgba(10,16,25,.98) 100%);border-bottom:1px solid var(--border2);box-shadow:0 1px 20px rgba(0,0,0,.5);padding:6px 16px;display:flex;align-items:center;gap:12px;height:52px;flex-shrink:0}
+.hdr{background:linear-gradient(180deg,var(--bg1) 0%,rgba(10,16,25,.98) 100%);border-bottom:1px solid var(--border2);box-shadow:0 1px 20px rgba(0,0,0,.5);padding:6px 16px;display:flex;align-items:center;gap:8px;height:52px;flex-shrink:0;overflow-x:auto;overflow-y:hidden}
 .logo{font-size:17px;font-weight:900;letter-spacing:3px;color:var(--gold);text-shadow:0 0 20px rgba(255,200,50,.4),0 0 40px rgba(255,200,50,.15);white-space:nowrap;font-family:'JetBrains Mono',monospace}
 .logo span{color:var(--cyan);text-shadow:0 0 16px rgba(0,232,255,.4)}
 .logo sub{font-size:8px;color:var(--text2);letter-spacing:1px;opacity:.7}
@@ -304,50 +304,42 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 
 <!-- AI CHAT MODAL -->
-<div id="aiChatModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(4,8,16,.96);backdrop-filter:blur(8px);flex-direction:column">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(61,142,255,.3);background:rgba(6,10,18,.9);flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:14px;font-weight:900;color:var(--cyan);letter-spacing:2px">🤖 MiniMax M2.5 — ProTrade AI Assistant</span>
-      <span id="chatModelBadge" style="font-size:8px;padding:2px 8px;border-radius:10px;background:rgba(61,142,255,.15);border:1px solid rgba(61,142,255,.3);color:var(--blue)">minimax-m2.5-free via OpenCode Zen</span>
-      <span id="chatStatus" style="font-size:8px;padding:2px 8px;border-radius:10px;background:rgba(0,240,122,.1);border:1px solid rgba(0,240,122,.3);color:var(--green)">READY</span>
+<div id="aiChatModal" style="display:none;position:fixed;right:0;top:52px;bottom:0;width:420px;z-index:8000;background:rgba(6,10,18,.98);backdrop-filter:blur(12px);border-left:1px solid rgba(61,142,255,.3);flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.6)">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(61,142,255,.25);background:rgba(4,8,16,.9);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;font-weight:900;color:var(--cyan);letter-spacing:1px">🤖 MiniMax M2.5</span>
+      <span id="chatModelBadge" style="font-size:7px;padding:1px 6px;border-radius:8px;background:rgba(61,142,255,.15);border:1px solid rgba(61,142,255,.3);color:var(--blue)">OpenCode Zen · Free</span>
+      <span id="chatStatus" style="font-size:7px;padding:1px 6px;border-radius:8px;background:rgba(0,240,122,.1);border:1px solid rgba(0,240,122,.3);color:var(--green)">READY</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button onclick="clearChat()" style="font-size:9px;padding:3px 10px;background:rgba(255,200,50,.1);border:1px solid rgba(255,200,50,.3);color:var(--gold);border-radius:4px;cursor:pointer">🗑 Clear</button>
-      <button onclick="closeAIChat()" style="font-size:9px;padding:3px 10px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:var(--red);border-radius:4px;cursor:pointer">✕ Close</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="clearChat()" style="font-size:8px;padding:2px 8px;background:rgba(255,200,50,.1);border:1px solid rgba(255,200,50,.3);color:var(--gold);border-radius:4px;cursor:pointer">🗑 Clear</button>
+      <button onclick="closeAIChat()" style="font-size:8px;padding:2px 8px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:var(--red);border-radius:4px;cursor:pointer">✕ Close</button>
     </div>
   </div>
-  <div style="display:flex;flex:1;overflow:hidden">
-    <!-- Context Sidebar -->
-    <div style="width:200px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);background:rgba(6,10,18,.5);overflow-y:auto;padding:10px;font-size:8px">
-      <div style="color:var(--gold);font-weight:900;letter-spacing:1px;margin-bottom:8px">📊 LIVE CONTEXT</div>
-      <div id="chatContextPanel" style="color:rgba(150,160,190,.7);line-height:1.8"></div>
-      <div style="color:var(--gold);font-weight:900;letter-spacing:1px;margin-top:12px;margin-bottom:6px">⚡ QUICK COMMANDS</div>
-      <div style="display:flex;flex-direction:column;gap:4px" id="quickCmds">
-        <button onclick="sendQuick('Mera current portfolio aur open trades dekho. Kya karna chahiye?')" class="qcmd">📈 Portfolio Analysis</button>
-        <button onclick="sendQuick('Aaj ke loss trades kyun hue? Kya galat tha? Suggest improvements.')" class="qcmd">❌ Loss Analysis</button>
-        <button onclick="sendQuick('Current market conditions kya hain? Intel Bot news aur indicators dekh ke bolo BUY karoon ya SELL ya WAIT?')" class="qcmd">🎯 Trade Advice</button>
-        <button onclick="sendQuick('Meri AI Memory weights dekho. Kaun sa indicator sabse reliable hai? Kya change karna chahiye?')" class="qcmd">🧠 Memory Review</button>
-        <button onclick="sendQuick('Risk management kaise improve karun? Mera win rate aur P&L dekh ke bolo.')" class="qcmd">⚖️ Risk Analysis</button>
-        <button onclick="sendQuick('Best trading setup abhi kaun si coin pe hai? Scanner data dekh ke bolo.')" class="qcmd">🔍 Best Setup</button>
-      </div>
+  <!-- Context Bar (horizontal compact) -->
+  <div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.05);background:rgba(4,8,16,.7);flex-shrink:0;overflow-x:auto" id="chatContextPanel"></div>
+  <!-- Quick Commands -->
+  <div style="display:flex;gap:4px;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);background:rgba(4,8,16,.5);flex-shrink:0;overflow-x:auto;flex-wrap:nowrap">
+    <button onclick="sendQuick('Mera current portfolio aur open trades dekho. Kya karna chahiye?')" class="qcmd" style="white-space:nowrap;flex-shrink:0">📈 Portfolio</button>
+    <button onclick="sendQuick('Aaj ke loss trades kyun hue? Kya galat tha? Suggest improvements.')" class="qcmd" style="white-space:nowrap;flex-shrink:0">❌ Loss Analysis</button>
+    <button onclick="sendQuick('Current market mein BUY karoon ya SELL ya WAIT? Indicators dekh ke bolo.')" class="qcmd" style="white-space:nowrap;flex-shrink:0">🎯 Advice</button>
+    <button onclick="sendQuick('Risk management kaise improve karun? Mera win rate aur P&L dekh ke bolo.')" class="qcmd" style="white-space:nowrap;flex-shrink:0">⚖️ Risk</button>
+    <button onclick="sendQuick('Best trading setup abhi kaun si coin pe hai? Scanner data dekh ke bolo.')" class="qcmd" style="white-space:nowrap;flex-shrink:0">🔍 Best Setup</button>
+  </div>
+  <!-- Chat Messages -->
+  <div id="chatMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px">
+    <div style="text-align:center;padding:20px 10px">
+      <div style="font-size:28px;margin-bottom:6px">🤖</div>
+      <div style="color:var(--cyan);font-size:11px;font-weight:900;margin-bottom:4px">MiniMax M2.5 Trading Assistant</div>
+      <div style="color:rgba(150,160,190,.6);font-size:9px;line-height:1.6">Trades, signals, indicators, balance sab dekh sakta hoon. Kuch bhi poochho!</div>
+      <div style="margin-top:8px;font-size:8px;color:rgba(150,160,190,.4)">⚠ Settings mein OpenCode Zen key enter karo to activate</div>
     </div>
-    <!-- Chat Area -->
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:32px;margin-bottom:8px">🤖</div>
-          <div style="color:var(--cyan);font-size:13px;font-weight:900;margin-bottom:6px">MiniMax M2.5 Trading Assistant</div>
-          <div style="color:rgba(150,160,190,.6);font-size:10px;max-width:400px;margin:0 auto;line-height:1.6">Main aapke poore trading terminal ka data dekh sakta hoon — trades, signals, indicators, balance, AI memory, news. Kuch bhi poochho ya action lene ko kaho.</div>
-          <div style="margin-top:12px;font-size:9px;color:rgba(150,160,190,.4)">⚠ OpenCode Zen key Settings mein enter karo to activate</div>
-        </div>
-      </div>
-      <div style="padding:12px;border-top:1px solid rgba(255,255,255,.06);background:rgba(6,10,18,.8);flex-shrink:0">
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea id="chatInput" placeholder="MiniMax se kuch bhi poochho — trades, signals, market analysis, ya koi bhi setting change karne ko kaho..." style="flex:1;background:rgba(14,22,34,.8);border:1px solid rgba(61,142,255,.3);border-radius:8px;color:var(--text);padding:10px 12px;font-size:11px;font-family:JetBrains Mono,monospace;resize:none;height:52px;outline:none;line-height:1.5" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
-          <button onclick="sendChat()" id="chatSendBtn" style="padding:10px 18px;background:linear-gradient(135deg,rgba(61,142,255,.3),rgba(191,95,255,.2));border:1px solid rgba(61,142,255,.5);color:var(--cyan);border-radius:8px;font-weight:900;font-size:11px;cursor:pointer;height:52px;white-space:nowrap;flex-shrink:0">▶ Send</button>
-        </div>
-        <div style="font-size:8px;color:rgba(150,160,190,.3);margin-top:4px">Enter = send · Shift+Enter = new line · MiniMax M2.5 has full access to your terminal data</div>
-      </div>
+  </div>
+  <!-- Input -->
+  <div style="padding:10px;border-top:1px solid rgba(255,255,255,.06);background:rgba(4,8,16,.9);flex-shrink:0">
+    <div style="display:flex;gap:6px;align-items:flex-end">
+      <textarea id="chatInput" placeholder="Kuch bhi poochho — Enter to send, Shift+Enter for new line..." style="flex:1;background:rgba(14,22,34,.8);border:1px solid rgba(61,142,255,.3);border-radius:6px;color:var(--text);padding:8px 10px;font-size:10px;font-family:JetBrains Mono,monospace;resize:none;height:44px;outline:none;line-height:1.5" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+      <button onclick="sendChat()" id="chatSendBtn" style="padding:8px 14px;background:linear-gradient(135deg,rgba(61,142,255,.3),rgba(191,95,255,.2));border:1px solid rgba(61,142,255,.5);color:var(--cyan);border-radius:6px;font-weight:900;font-size:11px;cursor:pointer;height:44px;white-space:nowrap;flex-shrink:0">▶</button>
     </div>
   </div>
 </div>
@@ -732,14 +724,30 @@ async function saveGeckoKey(){
   const inp=document.getElementById('geckoKeyInput');
   const st=document.getElementById('modalStatus');
   const key=inp.value.trim();
+  const nkEl=document.getElementById('opencodezenKeyInput');
+  const zenKey=nkEl?nkEl.value.trim():'';
+
+  // Save OpenCode Zen key immediately regardless of CoinGecko key
+  if(zenKey){ localStorage.setItem('ptai_opencodezen_key',zenKey); }
+
+  // If no CoinGecko key, just save Zen key and start IntelBot
   if(!key){
-    st.className='modal-status err';
-    st.textContent='⚠ Please enter a key, or click CLEAR to remove the existing one.';
+    if(zenKey){
+      st.className='modal-status ok';
+      st.textContent='✅ OpenCode Zen AI Key saved! Intel Bot starting...';
+      updateApiBadge();
+      IntelBot.start();
+      setTimeout(()=>closeSettings(),1200);
+    } else {
+      st.className='modal-status err';
+      st.textContent='⚠ Please enter at least the OpenCode Zen API key (sk-...) to use AI features.';
+    }
     return;
   }
-  // Quick verify — ping /ping endpoint with the key
+
+  // Verify CoinGecko key
   st.className='modal-status';
-  st.textContent='⏳ Verifying key...';
+  st.textContent='⏳ Verifying CoinGecko key...';
   try{
     const hdrs=key.startsWith('CG-')&&key.length>30
       ?{'x-cg-pro-api-key':key}
@@ -753,23 +761,19 @@ async function saveGeckoKey(){
     clearTimeout(to);
     if(r.ok||(r.status===429)){
       localStorage.setItem(GECKO_KEY_LS,key);
-      var nk=document.getElementById('opencodezenKeyInput');if(nk&&nk.value.trim())localStorage.setItem('ptai_opencodezen_key',nk.value.trim());
       st.className='modal-status ok';
-      st.textContent='✅ Keys saved! CoinGecko + OpenCode Zen MiniMax AI configured.';
+      st.textContent='✅ All keys saved! CoinGecko + OpenCode Zen MiniMax AI ready.';
       updateApiBadge();
       IntelBot.start();
       setTimeout(()=>{closeSettings();loadSym();},1200);
     } else {
-      const body=await r.json().catch(()=>({}));
       st.className='modal-status err';
-      st.textContent='❌ Invalid key (HTTP '+r.status+'). Check your CoinGecko dashboard.';
+      st.textContent='❌ CoinGecko key invalid (HTTP '+r.status+'). Zen AI key saved OK.';
     }
   }catch(e){
-    // Network error — save anyway (could just be CORS on ping)
     localStorage.setItem(GECKO_KEY_LS,key);
-    var nk2=document.getElementById('opencodezenKeyInput');if(nk2&&nk2.value.trim())localStorage.setItem('ptai_opencodezen_key',nk2.value.trim());
     st.className='modal-status ok';
-    st.textContent='✅ Keys saved! (Could not verify CoinGecko — will use on next request.)';
+    st.textContent='✅ Keys saved! (CoinGecko verify skipped — network issue)';
     updateApiBadge();
     IntelBot.start();
     setTimeout(()=>{closeSettings();loadSym();},1400);
@@ -3583,14 +3587,8 @@ function updateChatContext(){
   var losses=(S.trades||[]).filter(function(t){return t.status==='LOSS';}).length;
   var netPnl=(S.trades||[]).reduce(function(a,t){return a+t.pnl;},0);
   var wr=(wins+losses)>0?Math.round(wins/(wins+losses)*100):0;
-  el.innerHTML=''
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Symbol</div><div style="color:var(--gold);font-weight:900;margin-bottom:8px">'+(S.sym||'—')+'</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Balance</div><div style="color:var(--green);font-weight:900;margin-bottom:8px">Rs'+(S.bal||0).toFixed(0)+'</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Net P&L</div><div style="color:'+(netPnl>=0?'var(--green)':'var(--red)')+';font-weight:900;margin-bottom:8px">'+(netPnl>=0?'+':'')+'Rs'+netPnl.toFixed(0)+'</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Win Rate</div><div style="color:'+(wr>=50?'var(--green)':'var(--red)')+';font-weight:900;margin-bottom:8px">'+wr+'%</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Open Trades</div><div style="color:var(--cyan);font-weight:900;margin-bottom:8px">'+(S.open||[]).length+'</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Auto-Trade</div><div style="color:'+(S.auto?'var(--green)':'var(--red)')+';font-weight:900;margin-bottom:8px">'+(S.auto?'ON':'OFF')+'</div>'
-    +'<div style="color:rgba(150,160,190,.5);margin-bottom:2px">Intel Bias</div><div style="color:'+(S.intelSentiment==='bullish'?'var(--green)':S.intelSentiment==='bearish'?'var(--red)':'var(--gold)')+';font-weight:900">'+(S.intelBias||'—')+'</div>';
+  function chip(label,val,color){return '<div style="flex-shrink:0;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-size:8px"><div style="color:rgba(150,160,190,.5);font-size:7px">'+label+'</div><div style="color:'+color+';font-weight:900">'+val+'</div></div>';}
+  el.innerHTML=chip('SYM',S.sym||'—','var(--gold)')+chip('BAL','₹'+(S.bal||0).toFixed(0),'var(--green)')+chip('P&L',(netPnl>=0?'+':'')+'₹'+netPnl.toFixed(0),netPnl>=0?'var(--green)':'var(--red)')+chip('W/R',wr+'%',wr>=50?'var(--green)':'var(--red)')+chip('OPEN',(S.open||[]).length,'var(--cyan)')+chip('AUTO',S.auto?'ON':'OFF',S.auto?'var(--green)':'var(--red)')+chip('BIAS',S.intelBias||'—',S.intelSentiment==='bullish'?'var(--green)':S.intelSentiment==='bearish'?'var(--red)':'var(--gold)');
 }
 
 function appendMessage(role, text, actions){
