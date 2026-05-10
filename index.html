@@ -311,7 +311,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 @media (max-width:900px){
   #fgChipWrap{display:none!important}
   .balance-row .chip:nth-child(n+3){display:none}
-  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ):not(#aichatBtn){display:none}
+  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnJ):not(#aichatBtn){display:none}
   .api-badge{display:none}
   .scanner{width:155px;min-width:140px}
   .right{width:200px}
@@ -338,7 +338,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn" onclick="switchV('report')" id="btnR">📊 Report</button>
     <button class="hbtn" onclick="switchV('setups')" id="btnS">&#129504; Best Setups</button>
     <button class="hbtn" onclick="switchV('botcheck')" id="btnBot">&#129302; Bot Check</button>
-    <button class="hbtn" onclick="openDoctor()" id="btnDr" style="border-color:rgba(255,180,0,.4);color:#ffc832">🩺 Doctor</button>
+    
     <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
     <button class="hbtn" onclick="openAIChat()" id="aichatBtn" style="background:linear-gradient(135deg,rgba(61,142,255,.2),rgba(191,95,255,.2));border-color:rgba(61,142,255,.5);color:var(--cyan);font-weight:900">🤖 AI Chat</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
@@ -671,23 +671,6 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <div id="botcheckView" style="display:none;flex:1;overflow-y:auto;padding:16px;background:var(--bg0)">
   <div id="botcheckContent"></div>
 </div>
-<div id="doctorView" style="display:none;flex:1;overflow-y:auto;padding:16px;background:var(--bg0)">
-  <div id="doctorContent"></div>
-</div>
-
-<!-- STATUS BAR -->
-<div class="statusbar">
-  <span><span class="dot-live" id="dotLive" style="background:var(--gold)"></span><span id="sbStatus">CONNECTING</span></span>
-  <span id="sbTime">--:--:--</span>
-  <span id="sbSym">BTCUSDT</span>
-  <span id="sbTF">1m</span>
-  <span id="sbVol">Vol: --</span>
-  <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.7 | Always-On Trending Auto-Rotate</span>
-</div>
-
-</div>
-
 <script>
 // ==================== STATE ====================
 const SYMS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','TRXUSDT','NEARUSDT','ARBUSDT','OPUSDT','INJUSDT','SUIUSDT'];
@@ -1888,12 +1871,7 @@ function doAI(){
   var gbadge='<span style="font-size:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:3px;padding:1px 5px;color:'+gCol+';margin-left:5px">'+a.grade+'</span>';
 
   // ── DOCTOR BOT: consecutive loss check ────────────────────────────
-  var _rT=S.trades.slice(-10),_cL=0;
-  for(var _ci=_rT.length-1;_ci>=0;_ci--){if(_rT[_ci].status==='LOSS')_cL++;else break;}
-  S.consecLoss=_cL;
-  var _drBlocked=_cL>=5&&!S.drOverride;   // paused: 5+ losses
-  var _drCautious=_cL>=3&&!S.drOverride;  // cautious: 3+ losses
-
+  
   // ── MTF PRE-CHECK before firing any trade ─────────────────────────
   var _mth=S.mtfData[S.sym+'_1h'],_mt4=S.mtfData[S.sym+'_4h'];
   var _mtfKnown=typeof _mth!=='undefined'&&typeof _mt4!=='undefined';
@@ -1907,7 +1885,6 @@ function doAI(){
   // Grade gate: strong signal needs ≥B; weak needs A+
   var _gradeOk=(a.grade==='A+'||a.grade==='A'||a.grade==='B');
   var _gradeStrict=(a.grade==='A+');
-  // Doctor override label for UI
   var _drLabel='';
 
   if(a.isBuy){
@@ -2849,129 +2826,17 @@ function switchV(v){
   document.getElementById('reportView').style.display=v==='report'?'block':'none';
   document.getElementById('setupsView').style.display=v==='setups'?'block':'none';
   document.getElementById('botcheckView').style.display=v==='botcheck'?'block':'none';
-  document.getElementById('doctorView').style.display=v==='doctor'?'block':'none';
   document.getElementById('btnC').classList.toggle('act',v==='chart');
   document.getElementById('btnR').classList.toggle('act',v==='report');
   document.getElementById('btnS').classList.toggle('act',v==='setups');
   document.getElementById('btnBot').classList.toggle('act',v==='botcheck');
-  document.getElementById('btnDr').classList.toggle('act',v==='doctor');
   if(v==='report')document.getElementById('repContent').innerHTML=genReport();
   if(v==='setups')document.getElementById('setupsContent').innerHTML=genBestSetupsHtml();
   if(v==='botcheck'){botRender();}
-  if(v==='doctor'){runDoctorBot();}
 }
 
-function openDoctor(){switchV('doctor');}
 
 // ==================== DOCTOR BOT ====================
-function runDoctorBot(){
-  var el=document.getElementById('doctorContent');if(!el)return;
-  var trades=S.trades;
-  var wins=trades.filter(function(t){return t.status==='WIN';}).length;
-  var losses=trades.filter(function(t){return t.status==='LOSS';}).length;
-  var total=wins+losses;
-  var winRate=total?Math.round(wins/total*100):0;
-  var totalPnl=trades.reduce(function(a,t){return a+(t.pnl||0);},0);
-  var avgWin=wins?trades.filter(function(t){return t.status==='WIN';}).reduce(function(a,t){return a+t.pnl;},0)/wins:0;
-  var avgLoss=losses?Math.abs(trades.filter(function(t){return t.status==='LOSS';}).reduce(function(a,t){return a+t.pnl;},0)/losses):0;
-  var rr=avgLoss?avgWin/avgLoss:0;
-  // Consecutive loss
-  var recent=trades.slice(-15);
-  var cLoss=0;
-  for(var i=recent.length-1;i>=0;i--){if(recent[i].status==='LOSS')cLoss++;else break;}
-  S.consecLoss=cLoss;
-  // Symbol analysis
-  var symStats={};
-  trades.forEach(function(t){
-    if(!symStats[t.sym])symStats[t.sym]={w:0,l:0,pnl:0};
-    if(t.status==='WIN')symStats[t.sym].w++;
-    else if(t.status==='LOSS')symStats[t.sym].l++;
-    symStats[t.sym].pnl+=t.pnl||0;
-  });
-  var badSyms=Object.entries(symStats).filter(function(e){return e[1].l>e[1].w&&e[1].l>=2;}).sort(function(a,b){return (b[1].l-b[1].w)-(a[1].l-a[1].w);});
-  var goodSyms=Object.entries(symStats).filter(function(e){return e[1].w>e[1].l&&e[1].w>=2;}).sort(function(a,b){return (b[1].w-b[1].l)-(a[1].w-a[1].l);});
-  // Doctor mode
-  var mode='normal',modeCol='var(--green)',modeTxt='HEALTHY';
-  if(cLoss>=5||(!S.drOverride&&cLoss>=5)){mode='paused';modeCol='var(--red)';modeTxt='PAUSED';}
-  else if(cLoss>=3||winRate<40&&total>=8){mode='cautious';modeCol='var(--gold)';modeTxt='CAUTIOUS';}
-  S.drMode=mode;
-  // Diagnoses
-  var diags=[];
-  var prescriptions=[];
-  if(cLoss>=5){diags.push({t:'❌ CRITICAL: '+cLoss+' consecutive losses',c:'var(--red)'});prescriptions.push('Auto trading PAUSED — click Override to resume manually');}
-  else if(cLoss>=3){diags.push({t:'⚠ WARNING: '+cLoss+' consecutive losses detected',c:'var(--gold)'});prescriptions.push('Threshold raised to Grade A+ only until win');}
-  else if(cLoss>=1){diags.push({t:'ℹ '+cLoss+' recent loss — monitoring',c:'var(--cyan)'});}
-  if(winRate<40&&total>=8){diags.push({t:'📉 Win rate '+winRate+'% is below 40% target',c:'var(--red)'});prescriptions.push('Review losing symbols — avoid: '+(badSyms.slice(0,2).map(function(e){return e[0].replace('USDT','');}).join(', ')||'none flagged'));}
-  if(rr<1&&total>=5){diags.push({t:'⚖ Risk/Reward ratio '+rr.toFixed(2)+' is below 1:1',c:'var(--gold)'});prescriptions.push('Only take trades with TP2 >= 2x SL distance');}
-  if(avgLoss>avgWin&&total>=5){diags.push({t:'📊 Avg loss (₹'+avgLoss.toFixed(0)+') > avg win (₹'+avgWin.toFixed(0)+')',c:'var(--gold)'});prescriptions.push('Tighten stop-losses — use ATR-based SL strictly');}
-  if(badSyms.length){diags.push({t:'🚫 Worst symbols: '+badSyms.slice(0,3).map(function(e){return e[0].replace('USDT','')+'('+e[1].l+'L/'+e[1].w+'W)';}).join(' '),c:'var(--red)'});}
-  if(!diags.length)diags.push({t:'✅ AI is performing well — no issues detected',c:'var(--green)'});
-  if(!prescriptions.length)prescriptions.push('Continue current strategy — maintain discipline');
-  // World-class insights
-  var insights=[
-    '📌 Entry quality > quantity — 1 A+ trade beats 5 C-grade trades',
-    '📌 Never risk more than 2% per trade — protect the capital first',
-    '📌 Trend is your friend — only trade with HTF 1H+4H alignment',
-    '📌 Stochastic overbought + RSI >70 = avoid BUY entry (fake breakout risk)',
-    '📌 Volume confirmation is mandatory — low volume signals are traps',
-    '📌 After 2 losses: reduce size 50%. After 3 losses: stop and review',
-    '📌 Best trades come after consolidation breakouts with volume surge',
-    '📌 MACD cross + MA20>MA50 + above BB mid = ideal BUY confluence'
-  ];
-  var symRows=Object.entries(symStats).sort(function(a,b){return b[1].pnl-a[1].pnl;}).slice(0,8).map(function(e){
-    var wr=e[1].w+e[1].l?Math.round(e[1].w/(e[1].w+e[1].l)*100):0;
-    var pnlC=e[1].pnl>=0?'var(--green)':'var(--red)';
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(26,38,64,.4);font-size:10px">'+
-      '<span style="color:var(--text);font-weight:700;width:70px">'+e[0].replace('USDT','')+'</span>'+
-      '<span style="color:var(--green)">'+e[1].w+'W</span><span style="color:rgba(255,255,255,.3);margin:0 3px">/</span><span style="color:var(--red)">'+e[1].l+'L</span>'+
-      '<span style="color:var(--cyan);margin-left:8px">'+wr+'%</span>'+
-      '<span style="color:'+pnlC+';font-weight:900;margin-left:8px">'+(e[1].pnl>=0?'+':'')+'₹'+e[1].pnl.toFixed(0)+'</span>'+
-      '</div>';
-  }).join('');
-  var diagRows=diags.map(function(d){return '<div style="padding:7px 12px;border-left:3px solid '+d.c+';margin-bottom:6px;background:rgba(255,255,255,.02);border-radius:0 4px 4px 0;font-size:10px;color:'+d.c+'">'+d.t+'</div>';}).join('');
-  var rxRows=prescriptions.map(function(p){return '<div style="padding:6px 10px;background:rgba(0,232,255,.06);border:1px solid rgba(0,232,255,.15);border-radius:4px;margin-bottom:5px;font-size:10px;color:var(--cyan)">💊 '+p+'</div>';}).join('');
-  var insightRows=insights.map(function(t){return '<div style="padding:5px 0;border-bottom:1px solid rgba(26,38,64,.3);font-size:10px;color:var(--text2)">'+t+'</div>';}).join('');
-  el.innerHTML=[
-    '<div style="max-width:800px;margin:0 auto;font-family:Courier New,monospace;color:var(--text)">',
-    // Header
-    '<div style="text-align:center;padding:16px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);margin-bottom:14px">',
-    '<div style="font-size:22px">🩺</div>',
-    '<div style="font-size:16px;font-weight:900;color:var(--gold);letter-spacing:2px;margin:4px 0">DOCTOR BOT — AI TRADING HEALER</div>',
-    '<div style="font-size:10px;color:var(--cyan)">World-class trading analysis & auto-correction system</div>',
-    '<div style="margin-top:10px;padding:6px 20px;background:rgba(255,255,255,.05);border-radius:20px;display:inline-block;font-size:12px;font-weight:900;color:'+modeCol+'">STATUS: '+modeTxt+'</div>',
-    '</div>',
-    // Stats row
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">',
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--text2)">WIN RATE</div><div style="font-size:20px;font-weight:900;color:'+(winRate>=50?'var(--green)':winRate>=35?'var(--gold)':'var(--red)')+'">'+winRate+'%</div><div style="font-size:9px;color:var(--text2)">'+wins+'W / '+losses+'L</div></div>',
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--text2)">TOTAL P&L</div><div style="font-size:20px;font-weight:900;color:'+(totalPnl>=0?'var(--green)':'var(--red)')+'">₹'+totalPnl.toFixed(0)+'</div><div style="font-size:9px;color:var(--text2)">'+total+' trades</div></div>',
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--text2)">RISK/REWARD</div><div style="font-size:20px;font-weight:900;color:'+(rr>=1.5?'var(--green)':rr>=1?'var(--gold)':'var(--red)')+'">1:'+(rr?rr.toFixed(1):'--')+'</div><div style="font-size:9px;color:var(--text2)">avg win/loss</div></div>',
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--text2)">CONSEC LOSS</div><div style="font-size:20px;font-weight:900;color:'+(cLoss>=5?'var(--red)':cLoss>=3?'var(--gold)':'var(--green)')+'">'+cLoss+'</div><div style="font-size:9px;color:var(--text2)">'+(cLoss>=5?'PAUSED':cLoss>=3?'CAUTIOUS':'NORMAL')+'</div></div>',
-    '</div>',
-    // Diagnosis
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">',
-    '<div style="font-size:9px;color:var(--text2);letter-spacing:1px;margin-bottom:8px">🔬 DIAGNOSIS</div>',
-    diagRows,
-    '</div>',
-    // Prescription
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">',
-    '<div style="font-size:9px;color:var(--text2);letter-spacing:1px;margin-bottom:8px">💊 PRESCRIPTION (AUTO-APPLIED)</div>',
-    rxRows,
-    '</div>',
-    // Override button if paused/cautious
-    (mode!=='normal'?'<div style="text-align:center;margin-bottom:12px"><button onclick="S.drOverride=!S.drOverride;runDoctorBot();log(S.drOverride?\'🩺 Doctor override ON — manual control\':\'🩺 Doctor protection restored\',\'var(--gold)\')" style="padding:8px 24px;background:'+(S.drOverride?'rgba(255,45,85,.2)':'rgba(0,232,255,.1)')+';border:1px solid '+(S.drOverride?'var(--red)':'var(--cyan)')+';border-radius:6px;color:'+(S.drOverride?'var(--red)':'var(--cyan)')+';cursor:pointer;font-size:11px;font-weight:700">'+(S.drOverride?'🔴 Override ACTIVE — Click to restore protection':'⚡ Override Doctor Protection (trade manually)')+'</button></div>':''),
-    // Symbol performance
-    symRows?'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden"><div style="padding:8px 12px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border);font-size:9px;color:var(--text2);letter-spacing:1px">📊 SYMBOL PERFORMANCE</div>'+symRows+'</div>':'',
-    // World-class insights
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px">',
-    '<div style="font-size:9px;color:var(--gold);letter-spacing:1px;margin-bottom:8px">🌍 WORLD-CLASS TRADING RULES (Auto-enforced)</div>',
-    insightRows,
-    '</div>',
-    // Good symbols
-    goodSyms.length?'<div style="background:rgba(0,240,122,.04);border:1px solid rgba(0,240,122,.15);border-radius:6px;padding:10px;margin-bottom:10px;font-size:10px"><span style="color:var(--green);font-weight:700">✅ Best performing: </span>'+goodSyms.slice(0,3).map(function(e){return e[0].replace('USDT','')+'('+e[1].w+'W/'+e[1].l+'L)';}).join(' | ')+'</div>':'',
-    '<div style="text-align:center;margin-top:8px"><button onclick="runDoctorBot()" style="padding:7px 20px;background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.3);border-radius:6px;color:var(--gold);cursor:pointer;font-size:11px;font-weight:700">🔄 Re-Analyze</button></div>',
-    '</div>'
-  ].join('');
-}
 function resetAcc(){S.trades=[];S.open=[];S.bal=10000;S.tid=1;S.lastTradeT=0;S.equityHistory=[];localStorage.removeItem('protradeai_v4_state');log('↺ Account reset to ₹10,000 | NO LEVERAGE','var(--gold)');updateUI();}
 function log(msg,col){
   let l=document.getElementById('aiLog'),d=document.createElement('div');
@@ -3161,8 +3026,6 @@ function loadState(){
     if(Array.isArray(d.open))S.open=d.open;
     if(Array.isArray(d.equityHistory))S.equityHistory=d.equityHistory;
     if(typeof d.tid==='number')S.tid=d.tid;
-    if(typeof d.drOverride==='boolean')S.drOverride=d.drOverride;
-    if(typeof d.drMode==='string')S.drMode=d.drMode;
     log('💾 Saved data restored — Balance: ₹'+S.bal.toLocaleString('en-IN',{minimumFractionDigits:2})+' | Trades: '+S.trades.length,'var(--cyan)');
   }catch(e){
     log('⚠ Could not load saved state: '+e.message,'var(--gold)');
@@ -3177,11 +3040,6 @@ async function runMultiCoinMonitor(){
   if(_mcMonRunning){return;}
   // Scan always; trades only execute when S.auto is ON
   if(S.open.length>=5){log('📊 Multi-scan skipped — max 5 trades open','var(--gold)');return;}
-  // Doctor Bot block check
-  if(S.consecLoss>=5&&!S.drOverride){
-    log('🩺 Doctor Bot: Auto trading PAUSED ('+S.consecLoss+' consecutive losses)','var(--red)');
-    return;
-  }
   _mcMonRunning=true;
   let _t0=Date.now();
   log('⚡ Parallel scan — all 20 coins at once...','var(--cyan)');
