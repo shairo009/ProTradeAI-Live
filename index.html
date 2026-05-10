@@ -2256,9 +2256,27 @@ function execTrade(a,auto,symOverride){
 
   let risk=parseInt(document.getElementById('riskR').value)/100;
   let riskAmt=S.bal*risk;
-  let slDist=Math.abs(a.entry-a.sl)||a.entry*0.01;
+
+  // ── ATR-based minimum SL distance (prevents oversized positions on tight SLs) ──
+  let atrNow=S.ind&&S.ind.atr?S.ind.atr[S.ind.atr.length-1]:a.entry*0.005;
+  let minSlDist=atrNow*0.5; // SL must be at least 0.5x ATR away
+  let rawSlDist=Math.abs(a.entry-a.sl)||a.entry*0.01;
+  let slDist=Math.max(rawSlDist, minSlDist);
+
+  // ── Warn on 1m chart with very tight SL ──
+  if(S.tf==='1m'&&rawSlDist<minSlDist){
+    log('⚠ SL too tight for 1m chart — expanded to '+fmt(slDist)+' (0.5x ATR) to protect position size','var(--gold)');
+  }
+
   // NO LEVERAGE - spot only. size = units of crypto = risk amount / SL distance
   let size=parseFloat((riskAmt/slDist).toFixed(6));
+
+  // ── Position size cap: max loss cannot exceed 10% of balance ──
+  let maxSize=parseFloat(((S.bal*0.10)/slDist).toFixed(6));
+  if(size>maxSize){
+    log('⚠ Position size capped: '+size.toFixed(6)+' → '+maxSize.toFixed(6)+' (10% balance cap)','var(--gold)');
+    size=maxSize;
+  }
 
   let t={id:S.tid++,sym:tradeSym,dir:a.isBuy?'BUY':'SELL',entry:a.entry,sl:a.sl,tp1:a.tp1,tp2:a.tp2,tp3:a.tp3,tp4:a.tp4,size,riskAmt:parseFloat(riskAmt.toFixed(2)),openTime:new Date().toLocaleTimeString(),openTs:Date.now(),score:a.score,conf:a.conf,grade:a.grade,checks:a.checks,reasons:a.reasons.slice(0,2).join(', '),allReasons:a.reasons.slice(),bullCount:a.bullCount,bearCount:a.bearCount,volRatio:a.volRatio,status:'OPEN',pnl:0,tpHit:0,ticksOpen:0,src:auto?'AI AUTO':'MANUAL',tf:S.tf};
   S.open.push(t);
