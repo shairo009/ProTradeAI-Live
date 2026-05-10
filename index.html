@@ -322,7 +322,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.1</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.2</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -677,7 +677,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.1 | 7-Check Confluence + HTF Filter | Grade A+/A/B/C</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.2 | 7-Check Confluence + HTF Filter | 20-Coin Always-On Monitor</span>
 </div>
 
 </div>
@@ -2915,7 +2915,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.1 — Confluence + HTF Trend Filter online','var(--gold)');
+log('🚀 ProTrade AI v4.2 — 20-Coin Always-On Monitor active','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
@@ -2998,7 +2998,7 @@ var SCAN_SYMS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGE
 
 async function runMultiCoinMonitor(){
   if(_mcMonRunning){return;}
-  if(!S.auto){return;} // only when auto-trade is ON
+  // Scan always; trades only execute when S.auto is ON
   if(S.open.length>=5){log('📊 Multi-scan skipped — max 5 trades open','var(--gold)');return;}
   // Doctor Bot block check
   if(S.consecLoss>=5&&!S.drOverride){
@@ -3052,27 +3052,31 @@ async function runMultiCoinMonitor(){
 
   let traded=0;
   let lastTraded=null;
-  for(let c of candidates){
-    if(S.open.length>=5)break;
-    if(S.open.find(t=>t.sym===c.sym))continue;
-    // Reset lastTradeT so multiple coins can trade in same scan
-    S.lastTradeT=0;
-    log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'%',c.a.isBuy?'var(--green)':'var(--red)');
-    execTrade(c.a,true,c.sym);
-    playAlert(c.a.isBuy?'buy':'sell');
-    traded++;
-    lastTraded=c.sym;
-    await new Promise(res=>setTimeout(res,200));
+  if(S.auto){
+    for(let c of candidates){
+      if(S.open.length>=5)break;
+      if(S.open.find(t=>t.sym===c.sym))continue;
+      // Reset lastTradeT so multiple coins can trade in same scan
+      S.lastTradeT=0;
+      log('🤖 AUTO: '+(c.a.isBuy?'BUY':'SELL')+' '+c.sym+' | Score:'+c.a.score.toFixed(0)+' | Grade:'+c.a.grade+' | Conf:'+c.a.conf.toFixed(0)+'%',c.a.isBuy?'var(--green)':'var(--red)');
+      execTrade(c.a,true,c.sym);
+      playAlert(c.a.isBuy?'buy':'sell');
+      traded++;
+      lastTraded=c.sym;
+      await new Promise(res=>setTimeout(res,200));
+    }
+    if(traded>0&&lastTraded){
+      // Switch chart to last traded coin
+      document.getElementById('symSel').value=lastTraded;
+      S.sym=lastTraded;S.offset=0;
+      if(S.ws){try{S.ws.close();}catch(e){}}
+      loadSymbol();
+    }
   }
-
-  if(traded>0&&lastTraded){
-    // Switch chart to last traded coin
-    document.getElementById('symSel').value=lastTraded;
-    S.sym=lastTraded;S.offset=0;
-    if(S.ws){try{S.ws.close();}catch(e){}}
-    loadSymbol();
-  } else if(candidates.length===0){
+  if(candidates.length===0){
     log('🔭 Scan done — no qualifying signals on any of 20 coins','var(--gold)');
+  } else if(!S.auto){
+    log('🔭 Scan done — '+candidates.length+' signal(s) found. Enable Auto-Trade to execute.','var(--gold)');
   }
 
   _mcMonRunning=false;
