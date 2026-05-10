@@ -310,7 +310,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 @media (max-width:900px){
   #fgChipWrap{display:none!important}
   .balance-row .chip:nth-child(n+3){display:none}
-  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ){display:none}
+  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ):not(#aichatBtn){display:none}
   .api-badge{display:none}
   .scanner{width:155px;min-width:140px}
   .right{width:200px}
@@ -323,7 +323,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 <!-- HEADER -->
 <div class="hdr">
   <div class="logo">PRO<span>TRADE</span> AI <sub>v4.1</sub></div>
-  <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:11px">⚙ <span class="settings-label">Settings</span></button>
+  <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
     <div class="chip"><div class="cl">BALANCE</div><div class="cv" id="balEl">₹10,000</div></div>
@@ -3737,7 +3737,6 @@ async function sendChat(){
   var msg=(inp&&inp.value||'').trim();
   if(!msg)return;
   var key=getZenKey();
-  if(!key){appendMessage('assistant','OpenCode Zen key nahi mili! Settings mein key enter karo phir try karo.',[]);return;}
   inp.value='';
   appendMessage('user',msg,[]);
   _chatHistory.push({role:'user',content:msg});
@@ -3750,11 +3749,21 @@ async function sendChat(){
   var messages=[{role:'system',content:sysPrompt}].concat(_chatHistory.slice(-12));
   try{
     var ctrl=new AbortController();
-    var to=setTimeout(function(){ctrl.abort();},45000);
-    var resp=await fetch('https://opencode.ai/zen/v1/chat/completions',{
+    var to=setTimeout(function(){ctrl.abort();},60000);
+    var endpoint,headers,bodyObj;
+    if(key){
+      endpoint='https://opencode.ai/zen/v1/chat/completions';
+      headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
+      bodyObj={model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5};
+    } else {
+      endpoint='https://text.pollinations.ai/openai';
+      headers={'Content-Type':'application/json'};
+      bodyObj={model:'openai-large',messages:messages,max_tokens:800,temperature:0.5};
+    }
+    var resp=await fetch(endpoint,{
       method:'POST',signal:ctrl.signal,
-      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json',},
-      body:JSON.stringify({model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5})
+      headers:headers,
+      body:JSON.stringify(bodyObj)
     });
     clearTimeout(to);
     if(resp.ok){
@@ -3768,12 +3777,12 @@ async function sendChat(){
     } else {
       removeTyping();
       var errBody=await resp.text().catch(function(){return '';});
-      appendMessage('assistant','MiniMax error ('+resp.status+'). Settings mein OpenCode Zen key check karo.\n\nError: '+errBody.substring(0,150),[]);
+      appendMessage('assistant','AI error ('+resp.status+'). Please try again.\n\nError: '+errBody.substring(0,150),[]);
       setChatStatus('ERROR','red');
     }
   }catch(e){
     removeTyping();
-    appendMessage('assistant','Request failed: '+(e.message||'timeout')+'.\n\nSettings mein OpenCode Zen key check karo.',[]);
+    appendMessage('assistant','Request failed: '+(e.message||'timeout')+'. Please try again.',[]);
     setChatStatus('ERROR','red');
   }
   _chatTyping=false;
