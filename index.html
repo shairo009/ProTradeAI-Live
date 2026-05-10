@@ -323,7 +323,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.6</sub></div>
+  <div class="logo">PRO<span>TRADE</span> AI <sub>v4.7</sub></div>
   <button class="hbtn" id="settingsBtn" onclick="openSettings()" style="flex-shrink:0;background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.5);color:var(--gold);font-weight:900;font-size:14px" title="Settings">⚙</button>
   <div class="hdr-ticker" id="tickerRow"></div>
   <div class="balance-row" id="fgChipWrap" style="display:flex;align-items:center;gap:6px;margin-right:4px"><div class="chip" id="fgChip" style="min-width:80px;cursor:pointer;border-color:var(--border2)" title="Fear & Greed Index — click to refresh"><div class="cl">FEAR&GREED</div><div class="cv" id="fgVal" style="font-size:11px">...</div></div></div><div class="balance-row">
@@ -476,7 +476,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
         <button class="tf" onclick="setTF('4h')">4H</button>
         <button class="tf" onclick="setTF('1d')">1D</button>
       </div>
-      <button id="rotateBtn" onclick="toggleAutoRotate()" style="margin-left:auto;padding:3px 10px;border-radius:5px;border:1px solid rgba(61,142,255,.5);background:rgba(61,142,255,.15);color:var(--blue);cursor:pointer;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:900;letter-spacing:.5px;flex-shrink:0;transition:.15s" title="Auto-rotate chart every 20s through trending coins">🔄 AUTO</button>
+      <button id="rotateBtn" onclick="toggleAutoRotate()" style="margin-left:auto;padding:3px 10px;border-radius:5px;border:1px solid rgba(0,230,118,.5);background:rgba(0,230,118,.12);color:var(--green);cursor:pointer;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:900;letter-spacing:.5px;flex-shrink:0;transition:.15s" title="Auto-rotating every 20s — click to pause">⏸ PAUSE</button>
     </div>
 
     <div id="rotateBar" style="display:none;background:rgba(61,142,255,.08);border-bottom:1px solid rgba(61,142,255,.2);padding:4px 12px;display:none;align-items:center;gap:10px;height:28px;flex-shrink:0">
@@ -689,7 +689,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span id="sbTF">5m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
-  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.6 | Signal Flash Auto-Rotate + Trending Coins</span>
+  <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.7 | Always-On Trending Auto-Rotate</span>
 </div>
 
 </div>
@@ -2739,7 +2739,7 @@ function _arUpdateUI(){
   if(!bar)return;
   if(AR.active){
     bar.style.display='flex';
-    if(btn){btn.style.background='rgba(61,142,255,.25)';btn.style.borderColor='rgba(61,142,255,.7)';btn.style.color='var(--cyan)';btn.textContent='🔄 ON';}
+    if(btn){btn.style.background='rgba(0,230,118,.12)';btn.style.borderColor='rgba(0,230,118,.5)';btn.style.color='var(--green)';btn.textContent='⏸ PAUSE';btn.title='Auto-rotating every 20s — click to pause';}
     if(symLbl) symLbl.textContent=(AR.coins[AR.idx]||'').replace('USDT','')+'/USDT';
     if(idxLbl) idxLbl.textContent=(AR.idx+1)+'/'+AR.coins.length;
     if(cdLbl) cdLbl.textContent=AR.countdown+'s';
@@ -2750,7 +2750,7 @@ function _arUpdateUI(){
     }
   }else{
     bar.style.display='none';
-    if(btn){btn.style.background='rgba(61,142,255,.12)';btn.style.borderColor='rgba(61,142,255,.4)';btn.style.color='var(--blue)';btn.textContent='🔄 AUTO';}
+    if(btn){btn.style.background='rgba(255,200,50,.1)';btn.style.borderColor='rgba(255,200,50,.4)';btn.style.color='var(--gold)';btn.textContent='▶ RESUME';btn.title='Auto-rotate paused — click to resume';}
   }
 }
 
@@ -2785,7 +2785,7 @@ async function startAutoRotate(){
   AR.active=true;
   AR.idx=0;
   AR.countdown=AR_INTERVAL;
-  log('🔄 Auto-rotate STARTED — fetching trending coins...','var(--cyan)');
+  log('🔄 Auto-rotate ' + (AR._coinsLoaded ? 'RESUMED' : 'STARTED') + ' — cycling through trending coins every 20s','var(--cyan)');
   await fetchTrendingCoins();
   _arSwitchTo(0);
   _arUpdateUI();
@@ -2853,7 +2853,7 @@ function stopAutoRotate(){
   if(AR._cdTimer){clearInterval(AR._cdTimer);AR._cdTimer=null;}
   AR.countdown=AR_INTERVAL;
   _arUpdateUI();
-  log('🔄 Auto-rotate STOPPED','var(--gold)');
+  log('⏸ Auto-rotate PAUSED — click RESUME to continue','var(--gold)');
 }
 
 function toggleAutoRotate(){
@@ -3106,7 +3106,7 @@ function drawFGGauge(){
 // Alias for settings modal callbacks
 function loadSym(){loadSymbol();}
 
-log('🚀 ProTrade AI v4.6 — Signal Flash + Trending Auto-Rotate active','var(--gold)');
+log('🚀 ProTrade AI v4.7 — Always-On Auto-Rotate active','var(--gold)');
 log('📡 Connecting to Binance WebSocket...','var(--cyan)');
 
 // Show API key badge state on load
@@ -3139,6 +3139,9 @@ setInterval(()=>{if(S.dataReady)updateUI();},2000);
 
 // ── AUTO-SCAN: populate left scanner automatically after chart loads ──
 setTimeout(()=>{ if(typeof buildScanner==='function') buildScanner(); }, 8000);
+
+// ── AUTO-ROTATE: start automatically after page loads ──
+setTimeout(()=>{ startAutoRotate(); }, 6000);
 
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
