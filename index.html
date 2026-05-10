@@ -1376,9 +1376,9 @@ function analyze(candles,curPrice){
   // SMART FILTERS — gate that blocks low-quality trades
   var filters=[];
   var distToRes=(hi20-pr)/pr, distToSup=(pr-lo20)/pr;
-  if(totalScore>0&&distToRes<0.005)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
-  if(totalScore<0&&distToSup<0.005)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
-  if(Math.abs(totalScore)>20&&volRatio<0.65)filters.push('Low volume — no confirmation');
+  if(totalScore>0&&distToRes<0.003)filters.push('Near Resistance ('+((distToRes*100).toFixed(2))+'%)');
+  if(totalScore<0&&distToSup<0.003)filters.push('Near Support ('+((distToSup*100).toFixed(2))+'%)');
+  if(Math.abs(totalScore)>20&&volRatio<0.50)filters.push('Low volume — no confirmation');
   if(totalScore>0&&rsiV>76)filters.push('RSI too high to buy ('+rsiV.toFixed(0)+')');
   if(totalScore<0&&rsiV<24)filters.push('RSI too low to sell ('+rsiV.toFixed(0)+')');
   var minConf=totalScore>0?bullCount:bearCount;
@@ -1386,10 +1386,10 @@ function analyze(candles,curPrice){
   var isBlocked=filters.length>0;
 
   // SIGNAL DECISION — much stricter thresholds
-  var isBuy=totalScore>=35&&bullCount>=4&&!isBlocked;
-  var isBuyWeak=totalScore>=22&&bullCount>=3&&!isBlocked;
-  var isSell=totalScore<=-35&&bearCount>=4&&!isBlocked;
-  var isSellWeak=totalScore<=-22&&bearCount>=3&&!isBlocked;
+  var isBuy=totalScore>=28&&bullCount>=4&&!isBlocked;
+  var isBuyWeak=totalScore>=16&&bullCount>=3&&!isBlocked;
+  var isSell=totalScore<=-28&&bearCount>=4&&!isBlocked;
+  var isSellWeak=totalScore<=-16&&bearCount>=3&&!isBlocked;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
@@ -1452,7 +1452,7 @@ function doAI(){
   }else if(a.isBuyWeak){
     sig.innerHTML='↗ BUY'+gbadge; sig.style.color='#69f0ae';
     btn.className='ai-btn btn-buy'; btn.textContent='▲ BUY — '+a.bullCount+'/7 confirm';
-    if(S.auto&&a.conf>68&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
+    if(S.auto&&a.conf>58&&prevDir!=='buy'){execTrade(a,true);playAlert('buy');}
   }else if(a.isSell){
     sig.innerHTML='⬇ STRONG SELL'+gbadge; sig.style.color='var(--red)';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ EXECUTE SELL — '+a.bearCount+'/7';
@@ -1460,7 +1460,7 @@ function doAI(){
   }else if(a.isSellWeak){
     sig.innerHTML='↘ SELL'+gbadge; sig.style.color='#ff5252';
     btn.className='ai-btn btn-sell'; btn.textContent='▼ SELL — '+a.bearCount+'/7 confirm';
-    if(S.auto&&a.conf>68&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
+    if(S.auto&&a.conf>58&&prevDir!=='sell'){execTrade(a,true);playAlert('sell');}
   }else if(a.isBlocked&&Math.abs(a.score)>22){
     sig.innerHTML=(a.score>0?'⬆':'⬇')+' FILTERED'+gbadge; sig.style.color='var(--gold)';
     btn.className='ai-btn btn-wait';
