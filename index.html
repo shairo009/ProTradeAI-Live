@@ -468,9 +468,9 @@ tr:hover td{background:rgba(61,142,255,.04)}
         <button id="stBtn" onclick="toggleST()" style="padding:2px 8px;border-radius:4px;border:1px solid var(--border2);background:rgba(255,200,50,.15);color:var(--gold);cursor:pointer;font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:900;transition:.15s">ST</button>
       </div>
       <div class="tf-row">
-        <button class="tf" onclick="setTF('1m')">1m</button>
+        <button class="tf active" onclick="setTF('1m')">1m</button>
         <button class="tf" onclick="setTF('3m')">3m</button>
-        <button class="tf active" onclick="setTF('5m')">5m</button>
+        <button class="tf" onclick="setTF('5m')">5m</button>
         <button class="tf" onclick="setTF('15m')">15m</button>
         <button class="tf" onclick="setTF('1h')">1H</button>
         <button class="tf" onclick="setTF('4h')">4H</button>
@@ -686,7 +686,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
   <span><span class="dot-live" id="dotLive" style="background:var(--gold)"></span><span id="sbStatus">CONNECTING</span></span>
   <span id="sbTime">--:--:--</span>
   <span id="sbSym">BTCUSDT</span>
-  <span id="sbTF">5m</span>
+  <span id="sbTF">1m</span>
   <span id="sbVol">Vol: --</span>
   <span id="sbCandles">Candles: --</span>
   <span style="margin-left:auto;color:var(--text2)">ProTrade AI v4.7 | Always-On Trending Auto-Rotate</span>
@@ -702,7 +702,7 @@ const _STATE_KEY='protradeai_v4_state';
 
 const S = {
   bal:10000, startBal:10000,
-  candles:[], sym:'BTCUSDT', tf:'5m',
+  candles:[], sym:'BTCUSDT', tf:'1m',
   auto:true,
   trades:[], open:[],
   tid:1, lastTradeT:0,
