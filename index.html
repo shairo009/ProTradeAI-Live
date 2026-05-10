@@ -450,6 +450,16 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
     </div>
 
+    <div id="debugSec" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.15)">
+      <div onclick="toggleDebug()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:6px 12px;user-select:none">
+        <span style="font-size:9px;color:var(--gold);font-weight:900;letter-spacing:1.5px">&#128302; LIVE DEBUG</span>
+        <span id="debugToggle" style="font-size:8px;color:rgba(150,160,190,.4)">&#9660; OPEN</span>
+      </div>
+      <div id="debugContent" style="font-family:Courier New,monospace;display:none;padding:0 10px 8px">
+        <div style="color:var(--text2);font-size:9px;text-align:center;padding:6px 0">Waiting for AI signal...</div>
+      </div>
+    </div>
+
     <div class="rp-sec">
       <h4>⚡ OPEN POSITIONS (<span id="opPN">0</span>)</h4>
       <div id="opPos"><div style="color:var(--text2);font-size:10px;text-align:center;padding:10px 0">No open positions</div></div>
@@ -520,15 +530,6 @@ tr:hover td{background:rgba(61,142,255,.04)}
       </div>
     </div>
 
-    <div class="rp-sec" id="debugSec">
-      <h4 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleDebug()">
-        <span>&#128302; LIVE DEBUG</span>
-        <span id="debugToggle" style="font-size:8px;color:rgba(150,160,190,.5);font-weight:400">&#9660; HIDE</span>
-      </h4>
-      <div id="debugContent" style="font-family:Courier New,monospace">
-        <div style="color:var(--text2);font-size:9px;text-align:center;padding:6px 0">Waiting for AI signal...</div>
-      </div>
-    </div>
 
   </div>
 </div>
@@ -1443,18 +1444,18 @@ function analyze(candles,curPrice){
 }
 
 // ==================== LIVE DEBUG PANEL ====================
-var _debugOpen = true;
+var _debugOpen = false;
 function toggleDebug(){
   _debugOpen=!_debugOpen;
   var c=document.getElementById('debugContent');
   var t=document.getElementById('debugToggle');
   if(c)c.style.display=_debugOpen?'block':'none';
-  if(t)t.textContent=_debugOpen?'▼ HIDE':'▶ SHOW';
+  if(t)t.innerHTML=_debugOpen?'&#9650; CLOSE':'&#9660; OPEN';
 }
 
 function updateDebugPanel(a, prevDir, tradeResult){
   var el=document.getElementById('debugContent');
-  if(!el||!_debugOpen)return;
+  if(!el)return;
   var now=new Date().toLocaleTimeString('en',{hour12:false});
 
   // Score bar
