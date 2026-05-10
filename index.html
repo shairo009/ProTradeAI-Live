@@ -311,7 +311,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
 @media (max-width:900px){
   #fgChipWrap{display:none!important}
   .balance-row .chip:nth-child(n+3){display:none}
-  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ):not(#aichatBtn){display:none}
+  .hdr-btns .hbtn:not(.act):not(.scan):not(.jrnl):not(#btnR):not(#btnS):not(#btnBot):not(#btnDr):not(#btnJ):not(#aichatBtn):not(#rotateBtn){display:none}
   .api-badge{display:none}
   .scanner{width:155px;min-width:140px}
   .right{width:200px}
@@ -342,7 +342,7 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <button class="hbtn jrnl" onclick="openJournal()" id="btnJ">📓 Journal</button>
     <button class="hbtn" onclick="openAIChat()" id="aichatBtn" style="background:linear-gradient(135deg,rgba(61,142,255,.2),rgba(191,95,255,.2));border-color:rgba(61,142,255,.5);color:var(--cyan);font-weight:900">🤖 AI Chat</button>
     <button class="hbtn scan" onclick="runScan()">⚡ AI SCAN</button>
-    <button class="hbtn" id="rotateBtn" onclick="toggleAutoRotate()" style="background:rgba(61,142,255,.12);border-color:rgba(61,142,255,.4);color:var(--blue);font-weight:900" title="Auto-rotate through trending coins every 20s">🔄 AUTO</button>
+    <button class="hbtn" id="rotateBtn" onclick="toggleAutoRotate()" style="background:rgba(61,142,255,.15);border-color:rgba(61,142,255,.5);color:var(--blue);font-weight:900;min-width:72px;font-size:10px;letter-spacing:.3px" title="Auto-rotate chart through trending coins every 20s">🔄 AUTO</button>
     <span class="api-badge no-key hdr-secondary" id="apiBadge" onclick="openSettings()" title="CoinGecko API Key — click to configure">🔑 API KEY</span>
     <button class="hbtn hdr-secondary" id="sndBtn" onclick="toggleSound()">🔊 Snd ON</button>
     <button class="hbtn hdr-secondary" id="trailBtn" onclick="toggleTrail()">🔓 Trail OFF</button>
