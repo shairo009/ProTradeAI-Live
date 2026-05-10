@@ -1375,6 +1375,9 @@ function updateTick(price,vol){
   last.c=price;last.h=Math.max(last.h,price);last.l=Math.min(last.l,price);
   if(vol!==null&&vol!==undefined)last.v=vol;
   S.curPrice=price;
+  // Track price per symbol so multi-symbol positions stay live
+  if(!S.prices)S.prices={};
+  S.prices[S.sym]=price;
   updatePriceHdr(price);monitorTrades();
   S.tickCount++;
   if(S.tickCount%8===0){doAI();calcInds();}
@@ -1808,10 +1811,10 @@ function analyze(candles,curPrice){
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
 
-  // SIGNAL DECISION — 6/7 confluence required (strict mode)
-  var isBuy=totalScore>=40&&bullCount>=6;
+  // SIGNAL DECISION — 5/7 confluence required
+  var isBuy=totalScore>=40&&bullCount>=5;
   var isBuyWeak=false;
-  var isSell=totalScore<=-40&&bearCount>=6;
+  var isSell=totalScore<=-40&&bearCount>=5;
   var isSellWeak=false;
 
   // Confidence
@@ -2378,11 +2381,13 @@ function closeTrade(t,closeP,reason){
 }
 
 function monitorTrades(){
-  let pr=S.curPrice;if(!pr)return;
+  if(!S.prices)S.prices={};
   let now=Date.now();
   [...S.open].forEach(t=>{
-    // guard: trade must be for the same symbol currently loaded
-    if(t.sym!==S.sym)return;
+    // Use per-symbol price so multi-symbol positions stay live
+    let pr=S.prices[t.sym]||S.curPrice;
+    if(!pr)return;
+    t.curPrice=pr;
     t.ticksOpen++;
     t.pnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
     if(t.dir==='BUY'){
@@ -2686,10 +2691,48 @@ function updateUI(){
   if(!S.open.length)op.innerHTML='<div style="color:var(--text2);font-size:10px;text-align:center;padding:10px 0">No open positions</div>';
   else{
     op.innerHTML='';
+    if(!S.prices)S.prices={};
     S.open.forEach(t=>{
-      let pPct=t.riskAmt?Math.min(100,Math.abs(t.pnl/t.riskAmt*100)):0;
-      let d=document.createElement('div');d.className='pos-item';d.style.borderLeftColor=t.dir==='BUY'?'var(--green)':'var(--red)';
-      d.innerHTML=`<div class="pos-top"><span class="pos-sym">${t.sym.replace('USDT','')} <span style="font-size:9px;color:${t.dir==='BUY'?'var(--green)':'var(--red)'}">${t.dir}</span></span><span style="font-weight:900;font-size:11px;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}₹${t.pnl.toFixed(2)}</span></div><div class="pos-bot">Entry:${fmt(t.entry)} | SL:${fmt(t.sl)} | TP2:${fmt(t.tp2)} <button class="cbtn" onclick="manClose(${t.id})">✕ Close</button></div><div class="pos-bar"><div class="pos-fill" style="width:${pPct}%;background:${t.pnl>=0?'var(--green)':'var(--red)'}"></div></div>`;
+      let pr=S.prices[t.sym]||t.curPrice||t.entry;
+      let livePnl=parseFloat((t.dir==='BUY'?(pr-t.entry)*t.size:(t.entry-pr)*t.size).toFixed(2));
+      let pnlCol=livePnl>=0?'var(--green)':'var(--red)';
+      let dirCol=t.dir==='BUY'?'var(--green)':'var(--red)';
+      // Progress toward TP2: how far current price is from entry toward TP2
+      let totalMove=Math.abs(t.tp2-t.entry)||1;
+      let currentMove=t.dir==='BUY'?Math.max(0,pr-t.entry):Math.max(0,t.entry-pr);
+      let pPct=Math.min(100,Math.round(currentMove/totalMove*100));
+      // SL progress: how close to SL
+      let slDist=Math.abs(t.entry-t.sl)||1;
+      let slMove=t.dir==='BUY'?Math.max(0,t.entry-pr):Math.max(0,pr-t.entry);
+      let slPct=Math.min(100,Math.round(slMove/slDist*100));
+      let pnlStr=(livePnl>=0?'+':'')+'\u20B9'+livePnl.toFixed(2);
+      let pct=t.entry?((pr-t.entry)/t.entry*100*(t.dir==='BUY'?1:-1)):0;
+      let pctStr=(pct>=0?'+':'')+pct.toFixed(2)+'%';
+      let openMins=Math.round((Date.now()-t.openTs)/60000);
+      let d=document.createElement('div');
+      d.className='pos-item';
+      d.style.borderLeftColor=dirCol;
+      d.style.background=livePnl>=0?'linear-gradient(135deg,rgba(0,240,122,.04) 0%,rgba(18,28,46,.9) 100%)':'linear-gradient(135deg,rgba(255,45,85,.04) 0%,rgba(18,28,46,.9) 100%)';
+      d.innerHTML=`
+        <div class="pos-top" style="margin-bottom:5px">
+          <span class="pos-sym" style="font-size:12px">${t.sym.replace('USDT','')} <span style="font-size:10px;font-weight:900;color:${dirCol};background:${t.dir==='BUY'?'rgba(0,240,122,.12)':'rgba(255,45,85,.12)'};padding:1px 6px;border-radius:3px">${t.dir}</span></span>
+          <span style="font-weight:900;font-size:13px;color:${pnlCol}">${pnlStr}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px;font-size:9px">
+          <div style="color:var(--text2)">Entry: <span style="color:var(--text);font-weight:700">${fmt(t.entry)}</span></div>
+          <div style="color:var(--text2)">Now: <span style="color:${pnlCol};font-weight:900">${fmt(pr)}</span> <span style="color:${pnlCol};font-size:8px">(${pctStr})</span></div>
+          <div style="color:var(--text2)">SL: <span style="color:var(--red);font-weight:700">${fmt(t.sl)}</span></div>
+          <div style="color:var(--text2)">TP2: <span style="color:var(--green);font-weight:700">${fmt(t.tp2)}</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:8px;color:var(--text2)">TP Progress</span>
+          <span style="font-size:8px;color:${pnlCol};font-weight:700">${pPct}%</span>
+        </div>
+        <div class="pos-bar" style="margin-bottom:4px"><div class="pos-fill" style="width:${pPct}%;background:${livePnl>=0?'var(--green)':'rgba(255,200,50,.6)'}"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:8px;color:var(--text2)">⏱ ${openMins}min | Grade: <span style="color:var(--gold)">${t.grade||'—'}</span> | ${t.src||'AI'}</span>
+          <button class="cbtn" onclick="manClose(${t.id})" style="background:rgba(255,45,85,.15);color:var(--red);border:1px solid rgba(255,45,85,.3);font-weight:700">✕ Close</button>
+        </div>`;
       op.appendChild(d);
     });
   }
