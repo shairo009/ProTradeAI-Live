@@ -2482,6 +2482,10 @@ setTimeout(function(){
   if(ov&&ov.style.display!=='none'){ov.style.display='none';if(!S.dataReady){S.candles=buildCandles(BASE_PRICES[S.sym]||97000,0,220,S.tf);try{calcInds();}catch(e){}S.dataReady=true;renderAll();}}
 },3000);
 setInterval(()=>{if(S.dataReady)updateUI();},2000);
+
+// ── AUTO-SCAN: populate left scanner automatically after chart loads ──
+setTimeout(()=>{ if(typeof buildScanner==='function') buildScanner(); }, 8000);
+
 fetchFearGreed();
 setInterval(fetchFearGreed,5*60*1000);
 
@@ -2765,6 +2769,9 @@ async function runBotCheck(){
   domList.forEach(function(c){
     document.getElementById(c[1])?botPass("DOM: "+c[0],"#"+c[1]+" found ✓"):botFail("DOM: "+c[0],"#"+c[1]+" MISSING");
   });
+  // Scanner content check — verifies scanner actually has coin data loaded
+  var scanItems=document.getElementById('scanList')?document.getElementById('scanList').querySelectorAll('.scan-item').length:0;
+  scanItems>0?botPass("Scanner Content",scanItems+" coins loaded in scanner ✓"):botWarn("Scanner Content","Scanner list empty — auto-scan runs 8s after load or click AI SCAN");
   await new Promise(function(r){setTimeout(r,100);});
   // 2. Functions Check
   botInfo("CORE FUNCTIONS","Checking JavaScript functions...");
