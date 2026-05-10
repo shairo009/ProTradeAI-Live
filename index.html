@@ -959,7 +959,7 @@ function exportJournalCSV(){
 }
 
 // ==================== API ENGINE (CORS-SAFE) ====================
-// Multiple endpoints - works in India without VPN
+// Multiple endpoints - works in India/Pakistan without VPN
 // data-api.binance.vision is the public mirror — bypasses India geo-block
 const ENDPOINTS = [
   'https://data-api.binance.vision/api/v3',
@@ -974,6 +974,69 @@ const WS_ENDPOINTS = [
   'wss://stream.binance.com:443/ws',
   'wss://stream1.binance.com:9443/ws',
 ];
+// Bybit — globally accessible, no geo-block in Pakistan/India
+const BYBIT_BASE = 'https://api.bybit.com/v5/market';
+const BYBIT_WS = 'wss://stream.bybit.com/v5/public/spot';
+function bybitInterval(tf){const m={'1m':'1','3m':'3','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D'};return m[tf]||'1';}
+async function tryBybitKlines(sym,tf,limit){
+  try{
+    let ctrl=new AbortController();
+    let to=setTimeout(()=>ctrl.abort(),4000);
+    let r=await fetch(BYBIT_BASE+'/kline?symbol='+sym+'&interval='+bybitInterval(tf)+'&limit='+limit+'&category=spot',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(r.ok){
+      let d=await r.json();
+      if(d.result&&d.result.list&&d.result.list.length>0){
+        let list=d.result.list.slice().reverse();
+        S.apiSource='BYBIT';
+        log('✅ Bybit connected: '+list.length+' candles','var(--cyan)');
+        return list.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+      }
+    }
+  }catch(e){}
+  return null;
+}
+async function tryBybitPrice(sym){
+  try{
+    let ctrl=new AbortController();
+    let to=setTimeout(()=>ctrl.abort(),2500);
+    let r=await fetch(BYBIT_BASE+'/tickers?symbol='+sym+'&category=spot',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(r.ok){let d=await r.json();if(d.result&&d.result.list&&d.result.list[0])return parseFloat(d.result.list[0].lastPrice);}
+  }catch(e){}
+  return null;
+}
+let _bybitWs=null;
+function connectBybitWS(sym,tf){
+  if(_bybitWs){try{_bybitWs.close();}catch(e){}_bybitWs=null;}
+  try{
+    let ws=new WebSocket(BYBIT_WS);
+    let to=setTimeout(()=>{if(ws.readyState!==WebSocket.OPEN){try{ws.close();}catch(e){}}},4000);
+    ws.onopen=()=>{
+      clearTimeout(to);
+      _bybitWs=ws;
+      ws.send(JSON.stringify({op:'subscribe',args:['kline.'+bybitInterval(tf)+'.'+sym]}));
+      log('✅ Bybit WebSocket LIVE!','var(--cyan)');
+      setStatusLive('BYBIT WS LIVE','var(--cyan)');
+    };
+    ws.onmessage=e=>{
+      try{
+        let d=JSON.parse(e.data);
+        if(!d.data||!d.data[0])return;
+        let k=d.data[0];
+        let candle={t:+k.start,o:+k.open,h:+k.high,l:+k.low,c:+k.close,v:+k.volume};
+        if(S.candles.length){
+          let last=S.candles[S.candles.length-1];
+          if(last.t===candle.t){S.candles[S.candles.length-1]=candle;}
+          else if(k.confirm){S.candles.push(candle);if(S.candles.length>300)S.candles.shift();calcInds();}
+        }
+        updateTick(candle.c,candle.v);
+      }catch(err){}
+    };
+    ws.onerror=()=>{clearTimeout(to);};
+    ws.onclose=()=>{if(_bybitWs===ws){_bybitWs=null;}};
+  }catch(e){}
+}
 const GECKO_IDS={BTCUSDT:'bitcoin',ETHUSDT:'ethereum',BNBUSDT:'binancecoin',SOLUSDT:'solana',XRPUSDT:'ripple',ADAUSDT:'cardano',DOGEUSDT:'dogecoin',AVAXUSDT:'avalanche-2',LINKUSDT:'chainlink',DOTUSDT:'polkadot',MATICUSDT:'matic-network',LTCUSDT:'litecoin',UNIUSDT:'uniswap',ATOMUSDT:'cosmos',FTMUSDT:'fantom',NEARUSDT:'near',ARBUSDT:'arbitrum',OPUSDT:'optimism',INJUSDT:'injective-protocol',SUIUSDT:'sui'};
 // Updated prices — May 2026
 const BASE_PRICES={BTCUSDT:97000,ETHUSDT:1800,BNBUSDT:600,SOLUSDT:150,XRPUSDT:2.2,ADAUSDT:0.72,DOGEUSDT:0.18,AVAXUSDT:22,LINKUSDT:14,DOTUSDT:4.5,MATICUSDT:0.22,LTCUSDT:88,UNIUSDT:6.0,ATOMUSDT:4.5,FTMUSDT:0.65,NEARUSDT:2.8,ARBUSDT:0.38,OPUSDT:0.75,INJUSDT:12,SUIUSDT:3.5};
@@ -1123,6 +1186,20 @@ async function fetchKlinesQuiet(sym,tf,limit){
       }
     }catch(e){}
   }
+  // Try Bybit (no geo-block)
+  try{
+    let ctrl=new AbortController();
+    let to=setTimeout(()=>ctrl.abort(),3000);
+    let r=await fetch(BYBIT_BASE+'/kline?symbol='+sym+'&interval='+bybitInterval(tf)+'&limit='+limit+'&category=spot',{signal:ctrl.signal});
+    clearTimeout(to);
+    if(r.ok){
+      let d=await r.json();
+      if(d.result&&d.result.list&&d.result.list.length>0){
+        let list=d.result.list.slice().reverse();
+        return list.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+      }
+    }
+  }catch(e){}
   // Try CoinGecko
   try{
     let gid=GECKO_IDS[sym]||'bitcoin';
@@ -1162,10 +1239,16 @@ async function fetchKlines(sym,tf,limit){
   renderAll();
   try{doAI();}catch(e){}
   S.apiSource='SIMULATION';
+  setStatusLive('SIM MODE','var(--gold)');
 
   // Step 1: Binance (in background, upgrades chart when ready)
-  setLoadMsg('Fetching live data...');
+  setLoadMsg('Trying Binance...');
   let result=await tryBinanceKlines(sym,tf,limit);
+  if(result){S.candles=result;S.curPrice=result[result.length-1].c;try{calcInds();doAI();renderAll();}catch(e){}return result;}
+
+  // Step 1b: Bybit (globally accessible — no geo-block)
+  setLoadMsg('Trying Bybit...');
+  result=await tryBybitKlines(sym,tf,limit);
   if(result){S.candles=result;S.curPrice=result[result.length-1].c;try{calcInds();doAI();renderAll();}catch(e){}return result;}
 
   // Step 2: CoinGecko OHLC
@@ -1175,6 +1258,7 @@ async function fetchKlines(sym,tf,limit){
 
   // Step 3: Already rendered simulation — just return it
   log('⚠ Live APIs unavailable — showing built-in simulation','var(--gold)');
+  setStatusLive('SIM MODE','var(--gold)');
   return simData;
 }
 
@@ -1192,8 +1276,9 @@ function connectWS(){
 
 function tryWSEndpoints(idx){
   if(idx>=WS_ENDPOINTS.length){
-    log('⚠ All WebSocket endpoints failed — starting polling mode','var(--gold)');
-    startPolling();
+    log('⚠ Binance WS blocked — trying Bybit WS...','var(--gold)');
+    connectBybitWS(S.sym,S.tf);
+    setTimeout(()=>{if(!_bybitWs||_bybitWs.readyState!==WebSocket.OPEN){log('⚠ All WebSocket endpoints failed — starting polling mode','var(--gold)');startPolling();}},5000);
     return;
   }
   let url=WS_ENDPOINTS[idx]+'/'+S.sym.toLowerCase()+'@kline_'+S.tf;
@@ -1206,7 +1291,7 @@ function tryWSEndpoints(idx){
         try{ws.close();}catch(e){}
         tryWSEndpoints(idx+1);
       }
-    },5000);
+    },2500);
   }catch(e){
     tryWSEndpoints(idx+1);
     return;
@@ -1252,7 +1337,14 @@ function startPolling(){
     // Try Binance price first (fastest)
     let price=await tryBinancePrice(S.sym);
     if(price){
-      setStatusLive('POLL LIVE','var(--green)');
+      setStatusLive('BINANCE LIVE','var(--green)');
+      updateTick(price,null);
+      return;
+    }
+    // Try Bybit (no geo-block in Pakistan/India)
+    price=await tryBybitPrice(S.sym);
+    if(price){
+      setStatusLive('BYBIT LIVE','var(--cyan)');
       updateTick(price,null);
       return;
     }
@@ -1269,7 +1361,7 @@ function startPolling(){
       let chg=(Math.random()-0.49)*last.c*0.0007;
       updateTick(Math.max(last.l*0.99,last.c+chg),null);
     }
-    setStatusLive('SIMULATING','var(--gold)');
+    setStatusLive('SIM MODE','var(--gold)');
   }
 
   pollOnce();
