@@ -398,6 +398,9 @@ tr:hover td{background:rgba(61,142,255,.04)}
     <div class="modal-sub">Configure API keys for live data & AI Intelligence Bot</div>
     <label class="modal-label">CoinGecko API Key (Free — 30 calls/min)</label>
     <input class="modal-input" id="geckoKeyInput" type="password" placeholder="CG-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <label class="modal-label" style="margin-top:10px">🤖 OpenAI API Key (for AI Chat — GPT-4o-mini)</label>
+    <input class="modal-input" id="openaiKeyInput" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+    <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--cyan)">platform.openai.com/api-keys</a> — stores only in your browser, never shared</div>
     <label class="modal-label" style="margin-top:10px">🤖 OpenCode Zen API Key (for Intelligence Bot — MiniMax M2.5 Free)</label>
     <input class="modal-input" id="opencodezenKeyInput" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
     <div style="font-size:9px;color:rgba(150,160,190,.5);margin-top:3px">Get free key at <a href="https://opencode.ai/workspace" target="_blank" style="color:var(--cyan)">opencode.ai/workspace</a> — MiniMax M2.5 Free is 100% free on OpenCode Zen</div>
@@ -755,6 +758,7 @@ function openSettings(){
   const inp=document.getElementById('geckoKeyInput');
   const st=document.getElementById('modalStatus');
   inp.value=getGeckoKey();
+  var oaik=document.getElementById('openaiKeyInput');if(oaik)oaik.value=localStorage.getItem('ptai_openai_key')||'';
   var nki=document.getElementById('opencodezenKeyInput');if(nki)nki.value=localStorage.getItem('ptai_opencodezen_key')||'';
   st.className='modal-status';
   st.textContent='';
@@ -772,8 +776,11 @@ async function saveGeckoKey(){
   const key=inp.value.trim();
   const nkEl=document.getElementById('opencodezenKeyInput');
   const zenKey=nkEl?nkEl.value.trim():'';
+  const oaikEl=document.getElementById('openaiKeyInput');
+  const openaiKey=oaikEl?oaikEl.value.trim():'';
 
-  // Save OpenCode Zen key immediately regardless of CoinGecko key
+  // Save OpenAI key and OpenCode Zen key immediately
+  if(openaiKey){ localStorage.setItem('ptai_openai_key',openaiKey); }
   if(zenKey){ localStorage.setItem('ptai_opencodezen_key',zenKey); }
 
   // If no CoinGecko key, just save Zen key and start IntelBot
@@ -3917,6 +3924,7 @@ function appendTyping(){
 function removeTyping(){var el=document.getElementById('chatTypingIndicator');if(el)el.remove();}
 
 function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
+function getOpenAIKey(){ return localStorage.getItem('ptai_openai_key')||''; }
 
 function setChatStatus(label,color){
   var el=document.getElementById('chatStatus');
@@ -3946,6 +3954,12 @@ async function sendChat(){
     var sysPrompt=buildSystemPrompt(liveData);
     var messages=[{role:'system',content:sysPrompt}].concat(_chatHistory.slice(-12));
     var endpoints=[];
+    // 1st priority: OpenAI key if user set it
+    var openaiKey=getOpenAIKey();
+    if(openaiKey){
+      endpoints.push({url:'https://api.openai.com/v1/chat/completions',headers:{'Authorization':'Bearer '+openaiKey,'Content-Type':'application/json'},body:{model:'gpt-4o-mini',messages:messages,max_tokens:800,temperature:0.5}});
+    }
+    // 2nd: OpenCode Zen key
     if(key){
       endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
