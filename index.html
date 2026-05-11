@@ -4030,9 +4030,17 @@ var IntelBot = (function(){
   var _lastFetch = 0;
   var INTERVAL = 5 * 60 * 1000; // 5 minutes
   var OR_EP = 'https://opencode.ai/zen/v1/chat/completions';
-  var OR_MODEL = 'minimax-m2.7';
+  var OR_MODEL = 'minimax-m2.5-free';
 
-  function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
+  function getZenKey(){
+  // Check localStorage first
+  var k=localStorage.getItem('ptai_opencodezen_key');
+  if(k)return k;
+  // Try to get from window config (for Claude Code settings)
+  if(window.ANTHROPIC_API_KEY)return window.ANTHROPIC_API_KEY;
+  if(window.ENV && window.ENV.ANTHROPIC_API_KEY)return window.ENV.ANTHROPIC_API_KEY;
+  return '';
+}
 
   function setStatus(label, color){
     var el = document.getElementById('intelStatus');
@@ -4401,7 +4409,15 @@ function appendTyping(){
 
 function removeTyping(){var el=document.getElementById('chatTypingIndicator');if(el)el.remove();}
 
-function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
+function getZenKey(){
+  // Check localStorage first
+  var k=localStorage.getItem('ptai_opencodezen_key');
+  if(k)return k;
+  // Try to get from window config (for Claude Code settings)
+  if(window.ANTHROPIC_API_KEY)return window.ANTHROPIC_API_KEY;
+  if(window.ENV && window.ENV.ANTHROPIC_API_KEY)return window.ENV.ANTHROPIC_API_KEY;
+  return '';
+}
 function getOpenAIKey(){ return localStorage.getItem('ptai_openai_key')||''; }
 function getNvidiaKey(){ return localStorage.getItem('ptai_nvidia_key')||''; }
 
@@ -4443,9 +4459,9 @@ async function sendChat(){
     if(openaiKey){
       endpoints.push({url:'https://api.openai.com/v1/chat/completions',headers:{'Authorization':'Bearer '+openaiKey,'Content-Type':'application/json'},body:{model:'gpt-4o-mini',messages:messages,max_tokens:800,temperature:0.5}});
     }
-    // 3rd: OpenCode Zen key
+    // 3rd: OpenCode Zen key - Use minimax-m2.5-free as per user config
     if(key){
-      endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.7',messages:messages,max_tokens:800,temperature:0.5}});
+      endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
     // Free fallbacks
     endpoints.push({url:'https://api.pollinations.ai/v1/chat/completions',headers:{'Content-Type':'application/json'},body:{model:'openai',messages:messages,max_tokens:800,temperature:0.5}});
