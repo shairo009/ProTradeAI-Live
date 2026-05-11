@@ -1561,12 +1561,36 @@ function calcInds(){
 var AIMemory = (function(){
   var KEYS = ['rsi','macd','ma','stoch','bb','st','pattern'];
   var LS_KEY = 'ptai_memory_v5';
+  // Most reliable patterns (learned from trading literature)
+  var PATTERN_KNOWLEDGE = {
+    'Bullish Engulfing':{baseRel:0.72,trend:'bull',context:'Reversal at bottom'},
+    'Bearish Engulfing':{baseRel:0.70,trend:'bear',context:'Reversal at top'},
+    'Three White Soldiers':{baseRel:0.75,trend:'bull',context:'Strong uptrend continuation'},
+    'Three Black Crows':{baseRel:0.73,trend:'bear',context:'Strong downtrend continuation'},
+    'Morning Star':{baseRel:0.70,trend:'bull',context:'3-day bullish reversal'},
+    'Evening Star':{baseRel:0.68,trend:'bear',context:'3-day bearish reversal'},
+    'Hammer':{baseRel:0.65,trend:'bull',context:'Reversal at support'},
+    'Shooting Star':{baseRel:0.63,trend:'bear',context:'Reversal at resistance'},
+    'Bull Pinbar':{baseRel:0.68,trend:'bull',context:'Rejected lower prices'},
+    'Bear Pinbar':{baseRel:0.66,trend:'bear',context:'Rejected higher prices'},
+    'Piercing Line':{baseRel:0.64,trend:'bull',context:'Bullish reversal'},
+    'Dark Cloud Cover':{baseRel:0.62,trend:'bear',context:'Bearish reversal'},
+    'Abandoned Baby Bull':{baseRel:0.78,trend:'bull',context:'Rare strong reversal'},
+    'Abandoned Baby Bear':{baseRel:0.76,trend:'bear',context:'Rare strong reversal'},
+    'Tweezer Bottom':{baseRel:0.58,trend:'bull',context:'Support test'},
+    'Tweezer Top':{baseRel:0.56,trend:'bear',context:'Resistance test'},
+    'Dragon Fly Doji':{baseRel:0.62,trend:'bull',context:'Bullish reversal'},
+    'Gravestone Doji':{baseRel:0.60,trend:'bear',context:'Bearish reversal'},
+    'Bull Marubozu':{baseRel:0.60,trend:'bull',context:'Strong momentum'},
+    'Bear Marubozu':{baseRel:0.58,trend:'bear',context:'Strong momentum'}
+  };
   var data = {
     weights:{},stats:{},totalTrades:0,glmAdjustments:0,glmLastNote:'',glmLog:[],
     streak:{wins:0,losses:0,lastResult:null},
     timeframePerf:{},
     marketCondPerf:{trending:{},ranging:{}},
-    sessionPerf:{startTime:null, trades:0, pnl:0}
+    sessionPerf:{startTime:null, trades:0, pnl:0},
+    patternPerf:{}
   };
 
   function _def(){
@@ -1575,13 +1599,18 @@ var AIMemory = (function(){
       streak:{wins:0,losses:0,lastResult:null},
       timeframePerf:{},
       marketCondPerf:{trending:{},ranging:{}},
-      sessionPerf:{startTime:null, trades:0, pnl:0}
+      sessionPerf:{startTime:null, trades:0, pnl:0},
+      patternPerf:{}
     };
     KEYS.forEach(function(k){d.weights[k]=1.0;d.stats[k]={w:0,l:0};});
     ['5m','15m','1h','4h'].forEach(function(tf){
       d.timeframePerf[tf]={w:0,l:0,pnl:0};
       d.marketCondPerf.trending[tf]={w:0,l:0,pnl:0};
       d.marketCondPerf.ranging[tf]={w:0,l:0,pnl:0};
+    });
+    // Initialize pattern performance tracking
+    Object.keys(PATTERN_KNOWLEDGE).forEach(function(p){
+      d.patternPerf[p]={w:0,l:0,pnl:0,rel:PATTERN_KNOWLEDGE[p].baseRel};
     });
     return d;
   }
@@ -1599,6 +1628,11 @@ var AIMemory = (function(){
         if(!data.streak)data.streak={wins:0,losses:0,lastResult:null};
         if(!data.timeframePerf)data.timeframePerf={};
         if(!data.marketCondPerf)data.marketCondPerf={trending:{},ranging:{}};
+        if(!data.patternPerf)data.patternPerf={};
+        // Ensure all known patterns exist in patternPerf
+        Object.keys(PATTERN_KNOWLEDGE).forEach(function(p){
+          if(!data.patternPerf[p])data.patternPerf[p]={w:0,l:0,pnl:0,rel:PATTERN_KNOWLEDGE[p].baseRel};
+        });
       }
     }catch(e){data=_def();}
   }
@@ -1658,6 +1692,25 @@ var AIMemory = (function(){
     if(!data.marketCondPerf[cond][tf])data.marketCondPerf[cond][tf]={w:0,l:0,pnl:0};
     if(isWin)data.marketCondPerf[cond][tf].w++; else data.marketCondPerf[cond][tf].l++;
     data.marketCondPerf[cond][tf].pnl+=trade.pnl||0;
+
+    // Learn by pattern - which patterns work best
+    if(trade.checks && trade.checks.pattern && trade.checks.pattern.lbl){
+      var patName=trade.checks.pattern.lbl.split(' (')[0]; // Extract pattern name
+      var knownPat=Object.keys(PATTERN_KNOWLEDGE).find(function(k){return patName.indexOf(k)!==-1;});
+      if(knownPat){
+        if(!data.patternPerf[knownPat]){
+          data.patternPerf[knownPat]={w:0,l:0,pnl:0,rel:PATTERN_KNOWLEDGE[knownPat].baseRel};
+        }
+        if(isWin){
+          data.patternPerf[knownPat].w++;
+          data.patternPerf[knownPat].rel=Math.min(0.95,data.patternPerf[knownPat].rel+0.02);
+        } else {
+          data.patternPerf[knownPat].l++;
+          data.patternPerf[knownPat].rel=Math.max(0.30,data.patternPerf[knownPat].rel-0.03);
+        }
+        data.patternPerf[knownPat].pnl+=trade.pnl||0;
+      }
+    }
 
     // Slow decay toward 1.0 to prevent drift
     KEYS.forEach(function(k){data.weights[k]+=(1.0-data.weights[k])*0.01;});
@@ -1751,8 +1804,23 @@ var AIMemory = (function(){
   function getStreak(){return data.streak||{wins:0,losses:0};}
   function getTimeframePerf(){return data.timeframePerf||{};}
   function getMarketPerf(){return data.marketCondPerf||{trending:{},ranging:{}};}
+  function getPatternPerf(){return data.patternPerf||{};}
   function getBestTimeframe(){return getBestTimeframe();}
+  function getBestPattern(){return getBestPattern();}
   function getStreakRec(){return getStreakRecommendation();}
+
+  // Get best performing pattern
+  function getBestPattern(){
+    var best=null, bestWr=0;
+    Object.keys(data.patternPerf||{}).forEach(function(p){
+      var perf=data.patternPerf[p];
+      if(perf.w+perf.l >= 2) {
+        var wr=perf.w/(perf.w+perf.l);
+        if(wr>bestWr){bestWr=wr;best=p;}
+      }
+    });
+    return best;
+  }
 
   function reset(){data=_def();save();renderMemoryPanel();}
 
@@ -1772,7 +1840,9 @@ var AIMemory = (function(){
     getStreak:getStreak,
     getTimeframePerf:getTimeframePerf,
     getMarketPerf:getMarketPerf,
+    getPatternPerf:getPatternPerf,
     getBestTimeframe:getBestTimeframe,
+    getBestPattern:getBestPattern,
     getStreakRec:getStreakRec,
     reset:reset
   };
@@ -1820,6 +1890,19 @@ function renderMemoryPanel(){
     }
   }
 
+  // Show best pattern if any learned
+  var patPerf=AIMemory.getPatternPerf(), bestPat=AIMemory.getBestPattern();
+  var patHtml='';
+  if(bestPat && patPerf[bestPat]){
+    var pp=patPerf[bestPat];
+    var wr=pp.w+pp.l>0?Math.round(pp.w/(pp.w+pp.l)*100):0;
+    var rel=(pp.rel||0.5).toFixed(2);
+    patHtml='<div style="margin-top:4px;padding:3px 5px;background:rgba(0,232,255,.05);border-radius:3px;font-size:7px;display:flex;justify-content:space-between">'
+      +'<span style="color:var(--cyan)">📊 Best: '+bestPat+'</span>'
+      +'<span style="color:'+(wr>=60?'var(--green)':wr>=40?'var(--gold)':'var(--red)')+'">'+wr+'% ('+pp.w+'W/'+pp.l+'L) | Rel:'+rel+'</span>'
+      +'</div>';
+  }
+
   var learned=tot>0?'<span style="color:var(--green)">'+tot+' trades</span>':'<span style="color:rgba(150,160,190,.4)">Waiting...</span>';
   var glmBadge=glmAdj>0?'<span style="color:var(--purple);font-size:7px;background:rgba(191,95,255,.1);border:1px solid rgba(191,95,255,.25);padding:1px 5px;border-radius:3px">🤖 '+glmAdj+' tuned</span>':'';
   var lastGLM=glmNote?'<div style="font-size:7px;color:rgba(191,95,255,.7);margin-top:4px;padding:3px 5px;background:rgba(191,95,255,.05);border-left:2px solid rgba(191,95,255,.3);border-radius:0 3px 3px 0">🤖 '+glmNote+'</div>':'';
@@ -1828,6 +1911,7 @@ function renderMemoryPanel(){
     +rows
     +lastGLM
     +streakHtml
+    +patHtml
     +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="font-size:8px">'+learned+'</span>'
     +'<div style="display:flex;gap:4px">'
@@ -1857,22 +1941,58 @@ function analyze(candles,curPrice){
   var vol20=candles.slice(-20).reduce(function(a,c){return a+c.v;},0)/20||1;
   var volRatio=candles[n].v/vol20;
 
-  // Candle patterns
-  var patterns=[],cur=candles[n],prev=candles[n-1],prev2=candles[n>1?n-2:0];
+  // Candle patterns - ENHANCED with pattern reliability scores
+  var patterns=[],cur=candles[n],prev=candles[n-1],prev2=candles[n>1?n-2:0],prev3=candles[n>2?n-3:0];
   var cb=Math.abs(cur.c-cur.o),pb=Math.abs(prev.c-prev.o);
   var lw=Math.min(cur.o,cur.c)-cur.l,uw=cur.h-Math.max(cur.o,cur.c),rng=cur.h-cur.l||0.001;
-  if(cur.c>cur.o&&prev.c<prev.o&&cb>pb*1.05)patterns.push({n:'Bullish Engulfing',t:'bull',w:25});
-  if(cur.c<cur.o&&prev.c>prev.o&&cb>pb*1.05)patterns.push({n:'Bearish Engulfing',t:'bear',w:25});
-  if(lw>cb*2&&uw<cb&&cur.c>cur.o)patterns.push({n:'Hammer',t:'bull',w:18});
-  if(uw>cb*2&&lw<cb&&cur.c<cur.o)patterns.push({n:'Shooting Star',t:'bear',w:18});
-  if(cb<rng*0.12&&lw>rng*0.35&&uw>rng*0.35)patterns.push({n:'Doji',t:'neu',w:0});
-  if(cb>rng*0.82&&cur.c>cur.o)patterns.push({n:'Bull Marubozu',t:'bull',w:14});
-  if(cb>rng*0.82&&cur.c<cur.o)patterns.push({n:'Bear Marubozu',t:'bear',w:14});
-  if(lw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bull Pinbar',t:'bull',w:20});
-  if(uw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bear Pinbar',t:'bear',w:20});
-  var p2b=Math.abs(prev2.c-prev2.o);
-  if(prev2.c<prev2.o&&prev.c<prev.o&&cur.c>cur.o&&cur.c>prev2.o)patterns.push({n:'Morning Star',t:'bull',w:28});
-  if(prev2.c>prev2.o&&prev.c>prev.o&&cur.c<cur.o&&cur.c<prev2.o)patterns.push({n:'Evening Star',t:'bear',w:28});
+
+  // === HIGH RELIABILITY PATTERNS (Weight: 25-30) ===
+  if(cur.c>cur.o&&prev.c<prev.o&&cb>pb*1.05)patterns.push({n:'Bullish Engulfing',t:'bull',w:28,r:0.72,desc:'Strong reversal - previous downtrend broken'});
+  if(cur.c<cur.o&&prev.c>prev.o&&cb>pb*1.05)patterns.push({n:'Bearish Engulfing',t:'bear',w:28,r:0.70,desc:'Strong reversal - previous uptrend broken'});
+
+  // === MEDIUM-HIGH RELIABILITY PATTERNS (Weight: 22-25) ===
+  // Three consecutive white/black candles
+  var c3b=prev.c>prev.o, c2b=prev2.c>prev2.o, c1b=cur.c>cur.o;
+  var c3s=prev.c<prev.o, c2s=prev2.c<prev2.o, c1s=cur.c<prev.o;
+  if(c1b&&c2b&&c3b&&prev.c>prev2.c&&cur.c>prev.c)patterns.push({n:'Three White Soldiers',t:'bull',w:26,r:0.75,desc:'Very strong uptrend continuation'});
+  if(c1s&&c2s&&c3s&&prev.c<prev2.c&&cur.c<prev.c)patterns.push({n:'Three Black Crows',t:'bear',w:26,r:0.73,desc:'Very strong downtrend continuation'});
+
+  // === MEDIUM RELIABILITY PATTERNS (Weight: 18-22) ===
+  if(lw>cb*2&&uw<cb&&cur.c>cur.o)patterns.push({n:'Hammer',t:'bull',w:20,r:0.65,desc:'Bullish reversal at bottom - buyer's strength'});
+  if(uw>cb*2&&lw<cb&&cur.c<cur.o)patterns.push({n:'Shooting Star',t:'bear',w:20,r:0.63,desc:'Bearish reversal at top - seller's strength'});
+  if(lw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bull Pinbar',t:'bull',w:22,r:0.68,desc:'Rejected lower prices - bullish'});
+  if(uw>rng*0.6&&cb<rng*0.25)patterns.push({n:'Bear Pinbar',t:'bear',w:22,r:0.66,desc:'Rejected higher prices - bearish'});
+
+  // === MEDIUM-LOW RELIABILITY (Weight: 14-18) ===
+  if(cb>rng*0.82&&cur.c>cur.o)patterns.push({n:'Bull Marubozu',t:'bull',w:16,r:0.60,desc:'Strong momentum - continuation likely'});
+  if(cb>rng*0.82&&cur.c<cur.o)patterns.push({n:'Bear Marubozu',t:'bear',w:16,r:0.58,desc:'Strong momentum - continuation likely'});
+  if(cb<rng*0.12&&lw>rng*0.35&&uw>rng*0.35)patterns.push({n:'Doji',t:'neu',w:0,r:0.50,desc:'Indecision - wait for confirmation'});
+
+  // === DOJI VARIANTS ===
+  if(cb<rng*0.1&&lw>rng*0.4)patterns.push({n:'Dragon Fly Doji',t:'bull',w:12,r:0.62,desc:'Bullish reversal at support'});
+  if(cb<rng*0.1&&uw>rng*0.4)patterns.push({n:'Gravestone Doji',t:'bear',w:12,r:0.60,desc:'Bearish reversal at resistance'});
+
+  // === THREE-CANDLE PATTERNS ===
+  var p3b=Math.abs(prev3.c-prev3.o);
+  // Morning/Evening Star (3-candle reversal patterns)
+  if(prev2.c<prev2.o&&prev.c<prev.o&&cur.c>cur.o&&cur.c>prev2.o)patterns.push({n:'Morning Star',t:'bull',w:26,r:0.70,desc:'Strong bullish reversal - 3-day pattern'});
+  if(prev2.c>prev2.o&&prev.c>prev.o&&cur.c<prev.o&&cur.c<prev2.o)patterns.push({n:'Evening Star',t:'bear',w:26,r:0.68,desc:'Strong bearish reversal - 3-day pattern'});
+
+  // === TWO-CANDLE PATTERNS ===
+  // Piercing Line (bullish)
+  if(prev.c<prev.o&&cur.c>cur.o&&cur.c>(prev.o+prev.c)/2&&cur.c<prev.o)patterns.push({n:'Piercing Line',t:'bull',w:22,r:0.64,desc:'Bullish reversal - opens above mid of prev candle'});
+  // Dark Cloud Cover (bearish)
+  if(prev.c>prev.o&&cur.c<prev.o&&cur.c<(prev.o+prev.c)/2&&cur.c>prev.c)patterns.push({n:'Dark Cloud Cover',t:'bear',w:22,r:0.62,desc:'Bearish reversal - opens above prev then closes below mid'});
+
+  // === RARE BUT HIGHLY RELIABLE ===
+  // Abandoned Baby (very rare reversal)
+  if(prev.c<prev.o&&Math.abs(prev.c-prev.o)<rng*0.1&&cur.c>cur.o&&cb>rng*0.7)patterns.push({n:'Abandoned Baby Bull',t:'bull',w:30,r:0.78,desc:'Rare - strong bullish reversal signal'});
+  if(prev.c>prev.o&&Math.abs(prev.c-prev.o)<rng*0.1&&cur.c<prev.o&&cb>rng*0.7)patterns.push({n:'Abandoned Baby Bear',t:'bear',w:30,r:0.76,desc:'Rare - strong bearish reversal signal'});
+
+  // === TWEEZER BOTTOM/TOP ===
+  var prevLow=Math.min(prev.l,prev.c), prevHigh=Math.max(prev.h,prev.o);
+  if(Math.abs(cur.l-prevLow)<rng*0.05&&cur.c>cur.o)patterns.push({n:'Tweezer Bottom',t:'bull',w:18,r:0.58,desc:'Support test - potential bottom'});
+  if(Math.abs(cur.h-prevHigh)<rng*0.05&&cur.c<prev.o)patterns.push({n:'Tweezer Top',t:'bear',w:18,r:0.56,desc:'Resistance test - potential top'});
 
   // 7-CHECK CONFLUENCE SYSTEM
   var checks={};
@@ -1926,14 +2046,24 @@ function analyze(candles,curPrice){
     else checks.st={v:-1,lbl:sCrossDn?'ST Sell Cross ▼':'Supertrend Bear',sc:sCrossDn?-28:-14};
   }else checks.st={v:0,lbl:'ST loading',sc:0};
 
-  // C7: Candlestick Pattern
+  // C7: Candlestick Pattern (with reliability scoring)
   var bullPats=patterns.filter(function(p){return p.t==='bull';});
   var bearPats=patterns.filter(function(p){return p.t==='bear';});
-  var bBull=bullPats.reduce(function(a,p){return p.w>a?p.w:a;},0);
-  var bBear=bearPats.reduce(function(a,p){return p.w>a?p.w:a;},0);
-  if(bBull>0&&bBull>=bBear){var bp=bullPats.find(function(p){return p.w===bBull;});checks.pattern={v:1,lbl:bp.n,sc:Math.min(bBull,22)};}
-  else if(bBear>0){var brp=bearPats.find(function(p){return p.w===bBear;});checks.pattern={v:-1,lbl:brp.n,sc:-Math.min(bBear,22)};}
-  else checks.pattern={v:0,lbl:'No pattern',sc:0};
+  // Use reliability-weighted score for better accuracy
+  var bBull=bullPats.reduce(function(a,p){return Math.max(a,p.w * (p.r||0.5));},0);
+  var bBear=bearPats.reduce(function(a,p){return Math.max(a,p.w * (p.r||0.5));},0);
+  var bestBull=bullPats.reduce(function(a,p){return (p.w*(p.r||0.5))>(a?(a.w*(a.r||0.5)):0)?p:a;},null);
+  var bestBear=bearPats.reduce(function(a,p){return (p.w*(p.r||0.5))>(a?(a.w*(a.r||0.5)):0)?p:a;},null);
+
+  if(bBull>0&&bBull>=bBear){
+    var rel=(bestBull.r||0.5).toFixed(2);
+    checks.pattern={v:1,lbl:bestBull.n+' ('+rel+')',sc:Math.min(Math.round(bBull),22)};
+  }
+  else if(bBear>0){
+    var rel=(bestBear.r||0.5).toFixed(2);
+    checks.pattern={v:-1,lbl:bestBear.n+' ('+rel+')',sc:-Math.min(Math.round(bBear),22)};
+  }
+  else checks.pattern={v:0,lbl:'No strong pattern',sc:0};
 
   // Count confluence — apply AI learned weights to indicator scores
   var _memW=AIMemory.getWeights();
