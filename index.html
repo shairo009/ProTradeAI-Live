@@ -1811,11 +1811,11 @@ function analyze(candles,curPrice){
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
 
-  // SIGNAL DECISION — 5/7 confluence required
-  var isBuy=totalScore>=40&&bullCount>=5;
-  var isBuyWeak=false;
-  var isSell=totalScore<=-40&&bearCount>=5;
-  var isSellWeak=false;
+  // SIGNAL DECISION — ADVANCED: 6/7 confluence, higher threshold
+  var isBuy=totalScore>=50&&bullCount>=6;
+  var isBuyWeak=totalScore>=35&&bullCount>=5&&bullCount<6;
+  var isSell=totalScore<=-50&&bearCount>=6;
+  var isSellWeak=totalScore<=-35&&bearCount>=5&&bearCount<6;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
@@ -1823,12 +1823,12 @@ function analyze(candles,curPrice){
   if(mCross||mCrossD)confBase+=5;
   var conf=Math.min(94,confBase);
 
-  // Grade
+  // Grade — ADVANCED: stricter requirements for better quality trades
   var grade='D';
-  if(Math.abs(totalScore)>=60&&minConf>=6&&volRatio>1.2)grade='A+';
-  else if(Math.abs(totalScore)>=45&&minConf>=4)grade='A';
-  else if(Math.abs(totalScore)>=30&&minConf>=4)grade='B';
-  else if(Math.abs(totalScore)>=20&&minConf>=3)grade='C';
+  if(Math.abs(totalScore)>=70&&minConf>=6&&volRatio>1.4)grade='A+';
+  else if(Math.abs(totalScore)>=55&&minConf>=5)grade='A';
+  else if(Math.abs(totalScore)>=40&&minConf>=4)grade='B';
+  else if(Math.abs(totalScore)>=25&&minConf>=3)grade='C';
 
   // TP/SL (ATR-based + S/R aware) — SL=2x ATR for noise protection, R:R ≥ 2:1
   var dir=totalScore>0?1:-1;
@@ -1978,36 +1978,73 @@ function doAI(){
     if((a.isBuy||a.isBuyWeak)&&_mth>18&&_mt4>18)_preMtfAlign=true;
     if((a.isSell||a.isSellWeak)&&_mth<-18&&_mt4<-18)_preMtfAlign=true;
   }
-  // Grade gate: auto trade only on A or A+ grade (6/7 strict mode)
-  var _gradeOk=(a.grade==='A+'||a.grade==='A');
-  var _gradeStrict=(a.grade==='A+');
-  var _drLabel='';
+  // ==================== ADVANCED TRADING LOGIC v2 ====================
+  // Strict filters: Grade A+ ONLY, 6/7 confluence, 70%+ confidence, cooldown
+  var _canTrade=true;
+  var _blockReason='';
+  var _conf=a.isBuy?a.bullCount:a.bearCount;
+  var _now=Date.now();
 
+  // 1. Consecutive Loss Protection: pause after 3+ losses
+  if(S.consecLoss>=3){
+    _canTrade=false;_blockReason='Loss Cooldown';
+  }
+  // 2. Cooldown: 2 min between any trades
+  else if(_now-S.lastTradeT<120000){
+    _canTrade=false;_blockReason='Time Cooldown';
+  }
+  // 3. Grade A+ mandatory for auto trading
+  else if(a.grade!=='A+'){
+    _canTrade=false;_blockReason='Grade '+a.grade+' - need A+';
+  }
+  // 4. Strong signals ONLY - block weak signals
+  else if(!a.isBuy&&!a.isSell){
+    _canTrade=false;_blockReason='Weak Signal';
+  }
+  // 5. MTF Opposed: block if 1H+4H both opposite
+  else if(S.mtfStatus==='opposed'){
+    _canTrade=false;_blockReason='MTF Opposed';
+  }
+  // 6. Minimum 6/7 confluence required
+  else if(_conf<6){
+    _canTrade=false;_blockReason='Low Confluence '+_conf+'/7';
+  }
+  // 7. Confidence 70%+ required
+  else if(a.conf<70){
+    _canTrade=false;_blockReason='Low Conf '+Math.round(a.conf)+'%';
+  }
+
+  // Execute trade only if ALL conditions pass
+  if(S.auto&&_canTrade){
+    execTrade(a,true);
+    playAlert(a.isBuy?'buy':'sell');
+    log(' ADVANCED: A+ | '+_conf+'/7 | '+Math.round(a.conf)+'%','var(--cyan)');
+  }
+
+  // UI Display based on conditions
   if(a.isBuy){
-    sig.innerHTML='⬆ STRONG BUY'+gbadge+_drLabel; sig.style.color='var(--green)';
-    btn.className='ai-btn btn-buy'; btn.textContent='▲ EXECUTE BUY — '+a.bullCount+'/7';
-    if(S.auto&&_gradeOk){execTrade(a,true);playAlert('buy');}
+    sig.innerHTML='⬆ STRONG BUY'+gbadge+(_canTrade?' ✅':' '+_blockReason);
+    sig.style.color=_canTrade?'var(--green)':'var(--gold)';
+    btn.className='ai-btn '+(_canTrade?'btn-buy':'btn-wait');
+    btn.textContent=_canTrade?'▲ EXECUTE — '+a.bullCount+'/7':'⏸ '+_blockReason;
   }else if(a.isBuyWeak){
-    sig.innerHTML='↗ BUY'+gbadge+_drLabel; sig.style.color='#69f0ae';
-    btn.className='ai-btn btn-buy'; btn.textContent='▲ BUY — '+a.bullCount+'/7 confirm';
-    // Weak signal: only trade if Grade A+ AND MTF aligned AND not cautious
-    if(S.auto&&_gradeOk){execTrade(a,true);playAlert('buy');}
+    sig.innerHTML='↗ BUY (WEAK)'+gbadge; sig.style.color='#69f0ae';
+    btn.className='ai-btn btn-wait'; btn.textContent='⚡ Weak - no auto trade';
   }else if(a.isSell){
-    sig.innerHTML='⬇ STRONG SELL'+gbadge+_drLabel; sig.style.color='var(--red)';
-    btn.className='ai-btn btn-sell'; btn.textContent='▼ EXECUTE SELL — '+a.bearCount+'/7';
-    if(S.auto&&_gradeOk){execTrade(a,true);playAlert('sell');}
+    sig.innerHTML='⬇ STRONG SELL'+gbadge+(_canTrade?' ✅':' '+_blockReason);
+    sig.style.color=_canTrade?'var(--red)':'var(--gold)';
+    btn.className='ai-btn '+(_canTrade?'btn-sell':'btn-wait');
+    btn.textContent=_canTrade?'▼ EXECUTE — '+a.bearCount+'/7':'⏸ '+_blockReason;
   }else if(a.isSellWeak){
-    sig.innerHTML='↘ SELL'+gbadge+_drLabel; sig.style.color='#ff5252';
-    btn.className='ai-btn btn-sell'; btn.textContent='▼ SELL — '+a.bearCount+'/7 confirm';
-    // Weak signal: only trade if Grade A+ AND MTF aligned AND not cautious
-    if(S.auto&&_gradeOk){execTrade(a,true);playAlert('sell');}
+    sig.innerHTML='↘ SELL (WEAK)'+gbadge; sig.style.color='#ff5252';
+    btn.className='ai-btn btn-wait'; btn.textContent='⚡ Weak - no auto trade';
   }else if(a.isBlocked&&Math.abs(a.score)>22){
     sig.innerHTML=(a.score>0?'⬆':'⬇')+' FILTERED'+gbadge; sig.style.color='var(--gold)';
     btn.className='ai-btn btn-wait';
-    btn.textContent='⚠ '+(a.filters[0]||'Filter active').substring(0,30);
+    btn.textContent=' '+(a.filters[0]||'Filter active').substring(0,30);
   }else{
-    sig.innerHTML='⏳ WAIT'+gbadge; sig.style.color='var(--gold)';
-    btn.className='ai-btn btn-wait'; btn.textContent='⟳ Waiting for confluence...';
+    sig.innerHTML=' WAIT'+gbadge; sig.style.color='var(--gold)';
+    btn.className='ai-btn btn-wait'; btn.textContent=' Waiting for confluence...';
   }
   updateMTFPanel();
   // 🔄 Signal flash hook for auto-rotate
@@ -2327,7 +2364,7 @@ async function runScan(){
 function execTrade(a,auto,symOverride){
   let now=Date.now();
   let tradeSym=symOverride||S.sym;
-  if(now-S.lastTradeT<10000&&auto)return;
+  if(now-S.lastTradeT<120000&&auto)return; // 2 min cooldown for advanced logic
   if(S.open.length>=5){if(auto)return;log('⚠ Max 5 open trades','var(--gold)');return;}
   if(S.open.find(t=>t.sym===tradeSym)){if(auto)return;log('⚠ Already open: '+tradeSym,'var(--gold)');return;}
   if(S.bal<500){log('❌ Low balance','var(--red)');return;}
@@ -2368,6 +2405,8 @@ function closeTrade(t,closeP,reason){
   let pnl=t.dir==='BUY'?(closeP-t.entry)*t.size:(t.entry-closeP)*t.size;
   pnl=parseFloat(pnl.toFixed(2));
   t.status=pnl>=0?'WIN':'LOSS';
+  // Consecutive loss tracking for advanced logic cooldown
+  if(t.status==='LOSS'){S.consecLoss++;}else{S.consecLoss=0;}
   t.exit=parseFloat(closeP.toFixed(closeP<1?6:2));
   t.pnl=pnl;t.reason=reason;t.closeTime=new Date().toLocaleTimeString();
   S.bal+=pnl;
