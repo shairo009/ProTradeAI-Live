@@ -1946,6 +1946,20 @@ function analyze(candles,curPrice){
   var cb=Math.abs(cur.c-cur.o),pb=Math.abs(prev.c-prev.o);
   var lw=Math.min(cur.o,cur.c)-cur.l,uw=cur.h-Math.max(cur.o,cur.c),rng=cur.h-cur.l||0.001;
 
+  // === COMMON PATTERNS (Easy to find, trigger often) ===
+  // Green candle = bullish, Red = bearish
+  if(cur.c>cur.o&&cur.c>prev.c)patterns.push({n:'Green Above Green',t:'bull',w:12,r:0.52,desc:'Uptrend continuation'});
+  if(cur.c<cur.o&&cur.c<prev.c)patterns.push({n:'Red Below Red',t:'bear',w:12,r:0.52,desc:'Downtrend continuation'});
+  // Big volume + big move = strong signal
+  if(volRatio>1.5&&cur.c>cur.o)patterns.push({n:'High Vol Green',t:'bull',w:14,r:0.55,desc:'Strong buying volume'});
+  if(volRatio>1.5&&cur.c<cur.o)patterns.push({n:'High Vol Red',t:'bear',w:14,r:0.55,desc:'Strong selling volume'});
+  // Consecutive same color candles
+  if(prev.c>prev.o&&cur.c>cur.o)patterns.push({n:'2 Green Days',t:'bull',w:10,r:0.50,desc:'Short uptrend'});
+  if(prev.c<prev.o&&cur.c<cur.o)patterns.push({n:'2 Red Days',t:'bear',w:10,r:0.50,desc:'Short downtrend'});
+  // Close near high = bullish, near low = bearish
+  if((cur.h-cur.c)<rng*0.15)patterns.push({n:'Closed At High',t:'bull',w:8,r:0.48,desc:'Strong close'});
+  if((cur.c-cur.l)<rng*0.15)patterns.push({n:'Closed At Low',t:'bear',w:8,r:0.48,desc:'Weak close'});
+
   // === HIGH RELIABILITY PATTERNS (Weight: 25-30) ===
   if(cur.c>cur.o&&prev.c<prev.o&&cb>pb*1.05)patterns.push({n:'Bullish Engulfing',t:'bull',w:28,r:0.72,desc:'Strong reversal - previous downtrend broken'});
   if(cur.c<cur.o&&prev.c>prev.o&&cb>pb*1.05)patterns.push({n:'Bearish Engulfing',t:'bear',w:28,r:0.70,desc:'Strong reversal - previous uptrend broken'});
@@ -2055,13 +2069,19 @@ function analyze(candles,curPrice){
   var bestBull=bullPats.reduce(function(a,p){return (p.w*(p.r||0.5))>(a?(a.w*(a.r||0.5)):0)?p:a;},null);
   var bestBear=bearPats.reduce(function(a,p){return (p.w*(p.r||0.5))>(a?(a.w*(a.r||0.5)):0)?p:a;},null);
 
+  // More flexible pattern detection - allow any pattern with score > 5
   if(bBull>0&&bBull>=bBear){
     var rel=(bestBull.r||0.5).toFixed(2);
-    checks.pattern={v:1,lbl:bestBull.n+' ('+rel+')',sc:Math.min(Math.round(bBull),22)};
+    var sc=Math.round(bBull);
+    // Even weak patterns get through with reduced score
+    if(sc<8)sc=Math.max(6,sc-2);
+    checks.pattern={v:1,lbl:bestBull.n+' ('+rel+')',sc:sc};
   }
   else if(bBear>0){
     var rel=(bestBear.r||0.5).toFixed(2);
-    checks.pattern={v:-1,lbl:bestBear.n+' ('+rel+')',sc:-Math.min(Math.round(bBear),22)};
+    var sc=Math.round(bBear);
+    if(sc<8)sc=Math.max(6,sc-2);
+    checks.pattern={v:-1,lbl:bestBear.n+' ('+rel+')',sc:-sc};
   }
   else checks.pattern={v:0,lbl:'No strong pattern',sc:0};
 
@@ -2101,11 +2121,11 @@ function analyze(candles,curPrice){
   if(Math.abs(totalScore)>15&&minConf<3)filters.push('Only '+minConf+'/7 agree — need 3+');
   var isBlocked=filters.length>0;
 
-  // SIGNAL DECISION — ADVANCED: 6/7 confluence, higher threshold
-  var isBuy=totalScore>=50&&bullCount>=6;
-  var isBuyWeak=totalScore>=35&&bullCount>=5&&bullCount<6;
-  var isSell=totalScore<=-50&&bearCount>=6;
-  var isSellWeak=totalScore<=-35&&bearCount>=5&&bearCount<6;
+  // SIGNAL DECISION — More flexible for more trades
+  var isBuy=totalScore>=35&&bullCount>=5;
+  var isBuyWeak=totalScore>=25&&bullCount>=4;
+  var isSell=totalScore<=-35&&bearCount>=5;
+  var isSellWeak=totalScore<=-25&&bearCount>=4;
 
   // Confidence
   var confBase=38+Math.min(35,Math.abs(totalScore)*0.44)+Math.min(14,minConf*3.5);
@@ -3653,10 +3673,10 @@ async function runMultiCoinMonitor(){
   let _phase1=await Promise.allSettled(SCAN_SYMS.map(_fetchAnalyze));
   let _phase1Ok=_phase1.filter(function(r){return r.status==='fulfilled'&&r.value;}).map(function(r){return r.value;});
 
-  // Filter strong signals — STRICT: grade A+/A only, score≥45, not blocked
+  // Filter signals — MORE FLEXIBLE: score≥25, any grade C or better
   let _preCandidates=_phase1Ok.filter(function(d){
     let a=d.a;
-    return d.absScore>=45&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A');
+    return d.absScore>=25&&(a.isBuy||a.isSell)&&!a.isBlocked&&(a.grade==='A+'||a.grade==='A'||a.grade==='B'||a.grade==='C');
   });
 
   log('⚡ Phase 1 done in '+((Date.now()-_t0)/1000).toFixed(1)+'s — '+_preCandidates.length+' signal(s) pre-qualified out of '+_phase1Ok.length+' loaded','var(--cyan)');
