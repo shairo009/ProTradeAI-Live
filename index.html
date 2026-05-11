@@ -3793,7 +3793,7 @@ var IntelBot = (function(){
       clearTimeout(to);
       if(resp.ok){
         var data = await resp.json();
-        var txt = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+        var msg=data.choices&&data.choices[0]&&data.choices[0].message;var txt=(msg&&msg.content)||(msg&&msg.reasoning)||'';
         var jm = txt.match(/{[\s\S]*}/);
         if(jm){ try{ return JSON.parse(jm[0]); }catch(e){} }
       } else {
@@ -4136,7 +4136,9 @@ async function sendChat(){
         clearTimeout(to);
         if(resp.ok){
           var data=await resp.json();
-          reply=data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+          var msg=data.choices&&data.choices[0]&&data.choices[0].message;
+          // Check content OR reasoning (new model format)
+          reply=(msg&&msg.content)||(msg&&msg.reasoning)||'';
           if(reply)break;
         }
       }catch(e2){clearTimeout(to);}
@@ -4212,7 +4214,7 @@ async function glmLearnFromTrade(trade){
     clearTimeout(to);
     if(resp.ok){
       var data = await resp.json();
-      var text = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+      var msg=data.choices&&data.choices[0]&&data.choices[0].message;var text=(msg&&msg.content)||(msg&&msg.reasoning)||'';
       var jsonMatch = text.match(/\{[\s\S]*\}/);
       if(jsonMatch){
         try{
@@ -4275,7 +4277,7 @@ async function glmPeriodicReview(){
     clearTimeout(to);
     if(resp.ok){
       var data = await resp.json();
-      var text = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content||'';
+      var msg=data.choices&&data.choices[0]&&data.choices[0].message;var text=(msg&&msg.content)||(msg&&msg.reasoning)||'';
       var jsonMatch = text.match(/\{[\s\S]*\}/);
       if(jsonMatch){
         try{
