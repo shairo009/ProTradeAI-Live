@@ -3705,7 +3705,7 @@ var IntelBot = (function(){
   var _lastFetch = 0;
   var INTERVAL = 5 * 60 * 1000; // 5 minutes
   var OR_EP = 'https://opencode.ai/zen/v1/chat/completions';
-  var OR_MODEL = 'minimax-m2.7';
+  var OR_MODEL = 'minimax-m2.5-free';
 
   function getZenKey(){ return localStorage.getItem('ptai_opencodezen_key')||''; }
 
@@ -4120,7 +4120,7 @@ async function sendChat(){
     }
     // 3rd: OpenCode Zen key
     if(key){
-      endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.7',messages:messages,max_tokens:800,temperature:0.5}});
+      endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
     // Free fallbacks
     endpoints.push({url:'https://api.pollinations.ai/v1/chat/completions',headers:{'Content-Type':'application/json'},body:{model:'openai',messages:messages,max_tokens:800,temperature:0.5}});
@@ -4207,7 +4207,7 @@ async function glmLearnFromTrade(trade){
     var resp = await fetch('https://opencode.ai/zen/v1/chat/completions', {
       method: 'POST', signal: ctrl.signal,
       headers: {'Authorization':'Bearer '+key, 'Content-Type':'application/json', 'HTTP-Referer':'https://protrade-ai.replit.app', 'X-Title':'ProTrade AI'},
-      body: JSON.stringify({model:'minimax-m2.7', messages:[{role:'user',content:prompt}], max_tokens:300, temperature:0.2})
+      body: JSON.stringify({model:'minimax-m2.5-free', messages:[{role:'user',content:prompt}], max_tokens:300, temperature:0.2})
     });
     clearTimeout(to);
     if(resp.ok){
@@ -4270,7 +4270,7 @@ async function glmPeriodicReview(){
     var resp = await fetch('https://opencode.ai/zen/v1/chat/completions', {
       method:'POST', signal:ctrl.signal,
       headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json',},
-      body:JSON.stringify({model:'minimax-m2.7', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.2})
+      body:JSON.stringify({model:'minimax-m2.5-free', messages:[{role:'user',content:prompt}], max_tokens:400, temperature:0.2})
     });
     clearTimeout(to);
     if(resp.ok){
