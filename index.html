@@ -1067,8 +1067,8 @@ async function tryBinanceKlines(sym,tf,limit){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),3000);
-      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal,mode:'cors'});
+      let to=setTimeout(()=>ctrl.abort(),8000);
+      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal});
       clearTimeout(to);
       if(r.ok){
         let d=await r.json();
@@ -1135,8 +1135,8 @@ async function tryBinanceTicker(sym){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),2500);
-      let r=await fetch(ep+'/ticker/24hr?symbol='+sym,{signal:ctrl.signal,mode:'cors'});
+      let to=setTimeout(()=>ctrl.abort(),5000);
+      let r=await fetch(ep+'/ticker/24hr?symbol='+sym,{signal:ctrl.signal});
       clearTimeout(to);
       if(r.ok)return await r.json();
     }catch(e){}
@@ -1149,8 +1149,8 @@ async function tryBinancePrice(sym){
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
-      let to=setTimeout(()=>ctrl.abort(),2000);
-      let r=await fetch(ep+'/ticker/price?symbol='+sym,{signal:ctrl.signal,mode:'cors'});
+      let to=setTimeout(()=>ctrl.abort(),5000);
+      let r=await fetch(ep+'/ticker/price?symbol='+sym,{signal:ctrl.signal});
       clearTimeout(to);
       if(r.ok){let d=await r.json();return parseFloat(d.price);}
     }catch(e){}
@@ -1366,7 +1366,7 @@ function startPolling(){
   }
 
   pollOnce();
-  S.pollInterval=setInterval(pollOnce,4000);
+  S.pollInterval=setInterval(pollOnce,6000);
 }
 
 function updateTick(price,vol){
