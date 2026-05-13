@@ -1179,7 +1179,7 @@ async function fetchKlinesQuiet(sym,tf,limit){
     try{
       let ctrl=new AbortController();
       let to=setTimeout(()=>ctrl.abort(),3000);
-      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal,mode:'cors'});
+      let r=await fetch(ep+'/klines?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal});
       clearTimeout(to);
       if(r.ok){
         let d=await r.json();
