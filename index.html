@@ -1064,6 +1064,22 @@ function buildCandles(seed,chg,n,tf){
 
 // Try all Binance endpoints
 async function tryBinanceKlines(sym,tf,limit){
+  // Try Vercel proxy first (no CORS issue)
+  try{
+    let ctrl=new AbortController();
+    let to=setTimeout(()=>ctrl.abort(),8000);
+    let r=await fetch('/api/proxy?symbol='+sym+'&interval='+tf+'&limit='+limit,{signal:ctrl.signal,credentials:'omit'});
+    clearTimeout(to);
+    if(r.ok){
+      let d=await r.json();
+      if(Array.isArray(d)&&d.length>0){
+        log('✅ Live Binance via proxy','var(--green)');
+        S.apiSource='BINANCE';
+        return d.map(k=>({t:+k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v}));
+      }
+    }
+  }catch(e){}
+  // Fallback to direct Binance endpoints
   for(let ep of ENDPOINTS){
     try{
       let ctrl=new AbortController();
