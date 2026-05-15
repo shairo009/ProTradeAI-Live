@@ -316,7 +316,86 @@ tr:hover td{background:rgba(61,142,255,.04)}
   .scanner{width:155px;min-width:140px}
   .right{width:200px}
 }
-</style>
+
+/* ===== MOBILE (< 768px) ===== */
+@media (max-width:768px){
+  .hdr{padding:5px 8px;height:48px;gap:4px}
+  .logo{font-size:13px;letter-spacing:1px}
+  .balance-row{gap:3px}
+  .chip{padding:3px 8px;border-radius:5px}
+  .chip .cl{font-size:7px;letter-spacing:.5px}
+  .chip .cv{font-size:11px;font-weight:900}
+  .hbtn{padding:3px 8px;font-size:9px;border-radius:5px}
+  .hbtn.scan{font-size:9px;padding:3px 8px}
+  .status-pill{font-size:8px;padding:3px 8px}
+  .scanner{width:130px;min-width:110px}
+  .right{width:180px}
+  .ch-sym{font-size:13px}
+  .ch-pr{font-size:14px}
+  .trades-panel{height:140px}
+}
+
+/* ===== SMALL MOBILE (< 600px) ===== */
+@media (max-width:600px){
+  .hdr{height:44px;padding:4px 6px;gap:3px}
+  .logo{font-size:11px;letter-spacing:1px}
+  .logo sub{display:none}
+  .balance-row{display:none}
+  .status-pill{font-size:7px;padding:2px 6px}
+  .hbtn{padding:2px 6px;font-size:8px;border-radius:4px;letter-spacing:.2px}
+  .hbtn.scan{font-size:8px;padding:3px 7px}
+  .hdr-btns{gap:3px}
+  .scanner{position:absolute;left:0;top:44px;bottom:0;z-index:100;width:180px;min-width:150px;transform:translateX(-100%);transition:.3s}
+  .scanner.open{transform:translateX(0)}
+  .main{position:relative}
+  .right{width:160px}
+  .center{flex:1}
+  .ch-sym{font-size:12px}
+  .ch-pr{font-size:13px}
+  .sub-charts{height:70px}
+  .trades-panel{height:120px}
+}
+
+/* ===== PHONE (< 480px) ===== */
+@media (max-width:480px){
+  .hdr{height:40px;padding:3px 5px;gap:2px}
+  .logo{font-size:10px;letter-spacing:0}
+  .status-pill{font-size:7px;padding:2px 5px;border-radius:10px}
+  .hbtn{padding:2px 5px;font-size:7px;border-radius:4px}
+  .hbtn.scan{font-size:7px;padding:2px 6px}
+  .hdr-btns{gap:2px}
+  .scanner{width:160px;min-width:130px}
+  .right{width:140px}
+  .panel-title{font-size:9px;padding:5px 8px}
+  .si-sym{font-size:10px}
+  .si-price{font-size:9px}
+  .si-signal{font-size:7px;padding:1px 4px}
+  .si-conf{font-size:8px}
+  .ch-sym{font-size:11px}
+  .ch-pr{font-size:12px}
+  .tf{font-size:9px;padding:2px 6px}
+  .sym-sel{font-size:9px;padding:2px 6px}
+  .sub-charts{height:60px}
+  .trades-panel{height:100px}
+  .rp-sec{padding:6px 8px}
+  .rp-sec h4{font-size:8px}
+  .ai-sig{font-size:14px}
+  .ai-btn{font-size:10px;padding:7px}
+}
+
+/* ===== MINIMAL PHONE (< 360px) ===== */
+@media (max-width:360px){
+  .hdr{height:36px;padding:2px 4px}
+  .logo{font-size:9px}
+  .hbtn{font-size:6px;padding:2px 4px}
+  .hbtn.scan{font-size:6px}
+  .scanner{width:140px;min-width:120px}
+  .right{width:120px}
+  .si-sym{font-size:9px}
+  .si-price{font-size:8px}
+  .ch-sym{font-size:10px}
+  .ch-pr{font-size:11px}
+}
 </head>
 <body>
 <div id="app">
