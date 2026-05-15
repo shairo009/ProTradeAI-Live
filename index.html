@@ -4138,17 +4138,45 @@ async function sendChat(){
     if(key){
       endpoints.push({url:'https://opencode.ai/zen/v1/chat/completions',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:{model:'minimax-m2.5-free',messages:messages,max_tokens:800,temperature:0.5}});
     }
+    // Proxy fallback (Vercel server-side, no CORS)
+    endpoints.push({url:'/api/chat-proxy?model=openai-large',headers:{'Content-Type':'application/json'},body:{messages:messages},type:'proxy'});
     // Free fallbacks
     endpoints.push({url:'https://api.pollinations.ai/v1/chat/completions',headers:{'Content-Type':'application/json'},body:{model:'openai',messages:messages,max_tokens:800,temperature:0.5}});
-    endpoints.push({url:'https://text.pollinations.ai/openai',headers:{'Content-Type':'application/json'},body:{model:'openai-large',messages:messages,max_tokens:800,temperature:0.5}});
+    endpoints.push({url:'https://text.pollinations.ai/openai',headers:{'Content-Type':'application/json'},body:{model:'openai-large',messages:messages,max_tokens:800,temperature:0.5},type:'get'});
 
     var reply='';
     for(var ei=0;ei<endpoints.length;ei++){
       var ep=endpoints[ei];
       try{
         var ctrl=new AbortController();
-        var to=setTimeout(function(){ctrl.abort();},30000);
-        var resp=await fetch(ep.url,{method:'POST',signal:ctrl.signal,headers:ep.headers,body:JSON.stringify(ep.body)});
+        var to=setTimeout(function(){ctrl.abort();},60000);
+        var fetchOptions={signal:ctrl.signal,headers:ep.headers};
+        if(ep.type==='get'){
+          // GET request for text/pollinations
+          var m=encodeURIComponent(JSON.stringify(ep.body.messages));
+          fetchOptions.method='GET';
+          delete fetchOptions.headers['Content-Type'];
+          var resp=await fetch(ep.url+'&messages='+m+'&model='+(ep.body.model||'openai-large'),fetchOptions);
+        } else if(ep.type==='proxy'){
+          // Vercel proxy - GET with JSON body via URL
+          fetchOptions.method='GET';
+          delete fetchOptions.headers['Content-Type'];
+          var proxUrl=ep.url+'&messages='+encodeURIComponent(JSON.stringify(ep.body.messages));
+          var resp=await fetch(proxUrl,fetchOptions);
+          if(resp.ok){
+            var data=await resp.json();
+            var msg=data.choices&&data.choices[0]&&data.choices[0].message;
+            reply=(msg&&msg.content)||'';
+            clearTimeout(to);
+            if(reply){removeTyping();_chatHistory.push({role:'assistant',content:reply});appendMessage('assistant',reply,[]);setChatStatus('READY','green');return;}
+          }
+          clearTimeout(to);
+          continue;
+        } else {
+          fetchOptions.method='POST';
+          fetchOptions.body=JSON.stringify(ep.body);
+          var resp=await fetch(ep.url,fetchOptions);
+        }
         clearTimeout(to);
         if(resp.ok){
           var data=await resp.json();
